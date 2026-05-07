@@ -39,7 +39,6 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[str] = mapped_column(
         String(255),
         nullable=False,
-        server_default="",  # temporary default; always set explicitly
     )
 
     # ── Authorization ─────────────────────────────────────────────────────────
