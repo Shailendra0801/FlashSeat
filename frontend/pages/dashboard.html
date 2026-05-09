@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - FlashSeat</title>
+  <link rel="stylesheet" href="../css/style.css">
+</head>
+<body>
+  <div class="app-shell">
+    
+    <!-- Header -->
+    <header class="header">
+      <h2>FlashSeat</h2>
+      <div class="header-right">
+        <span id="userGreeting">Welcome, User</span>
+        <button id="logoutBtn" class="btn-logout">Logout</button>
+      </div>
+    </header>
+
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <nav>
+        <ul>
+          <li class="active"><a href="#">🏠 Dashboard</a></li>
+          <li><a href="#">🎟️ Events</a></li>
+          <li><a href="#">📅 My Bookings</a></li>
+          <li><a href="#">👤 Profile</a></li>
+        </ul>
+      </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+      <h1>Welcome Back!</h1>
+      
+      <div class="card">
+        <h3>Upcoming Events</h3>
+        <div id="eventsList">
+          <p>Loading events...</p>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="../js/dashboard.js"></script>
+</body>
+</html>

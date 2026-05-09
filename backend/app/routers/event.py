@@ -339,7 +339,6 @@ async def list_events(
 @router.get(
     "/{event_id}/seats",
     response_model=SeatMapResponse,
-    summary="Get seat availability map for a session (Public)",
 )
 async def get_seat_map(
     event_id: uuid.UUID,
@@ -384,20 +383,23 @@ async def get_seat_map(
         .join(Seat, Seat.seat_id == SessionSeat.seat_id)
         .where(SessionSeat.session_id == session_id)
         .order_by(Seat.row_name, Seat.seat_number)
-        # Ordered by row and seat number for a clean seat map display
     )
     rows = seats_result.all()
 
     if not rows:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No seats found for this session",
-        )
+        raise HTTPException(status_code=404, detail="No seats found for this session")
 
-    # ── Count booked seats ────────────────────────────────────────────────────
-    booked_count = sum(
-        1 for ss, _ in rows if ss.status == SessionSeatStatus.BOOKED
-    )
+    # ── Count different statuses ─────────────────────────────────────────────
+    booked_count = 0
+    blocked_count = 0
+
+    for ss, _ in rows:
+        if ss.status == SessionSeatStatus.BOOKED:
+            booked_count += 1
+        elif ss.status == SessionSeatStatus.BLOCKED:   # or RESERVED, MAINTENANCE etc.
+            blocked_count += 1
+
+    total_unavailable = booked_count + blocked_count
 
     # ── Build response ────────────────────────────────────────────────────────
     return SeatMapResponse(
@@ -406,7 +408,9 @@ async def get_seat_map(
         session_name=session.session_name,
         total_seats=session.total_seats,
         available_seats=session.available_seats,
-        booked_seats=booked_count,
+        booked_seats=booked_count,           
+        blocked_seats=blocked_count,         
+        unavailable_seats=total_unavailable, # Total unavailable (booked + blocked)
         seats=[
             SeatMapItem(
                 session_seat_id=ss.session_seat_id,
@@ -419,5 +423,70 @@ async def get_seat_map(
                 booked_at=ss.booked_at,
             )
             for ss, seat in rows
+        ],
+    )
+    
+    
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /events/{event_id} — Get full event details with sessions
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get(
+    "/{event_id}",
+    response_model=EventResponse,
+    summary="Get detailed event information including all sessions (Public)",
+)
+async def get_event_detail(
+    event_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_session),
+):
+    """
+    Returns full event details along with all its sessions.
+    Useful for frontend event detail / seat selection page.
+    """
+
+    # ── Fetch Event ───────────────────────────────────────────────────────────
+    event_result = await db.execute(
+        select(Event).where(Event.event_id == event_id)
+    )
+    event = event_result.scalar_one_or_none()
+
+    if not event:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Event not found"
+        )
+
+    # ── Fetch All Sessions for this Event ─────────────────────────────────────
+    sessions_result = await db.execute(
+        select(EventSession)
+        .where(EventSession.event_id == event_id)
+        .order_by(EventSession.start_time)
+    )
+    sessions = sessions_result.scalars().all()
+
+    # ── Build Response ────────────────────────────────────────────────────────
+    return EventResponse(
+        event_id=event.event_id,
+        title=event.title,
+        description=event.description,
+        category=event.category,
+        venue_name=event.venue_name,
+        venue_city=event.venue_city,
+        created_by=event.created_by,
+        created_at=event.created_at,
+        total_seats=0,  # Will be calculated from seats or first session
+        total_sessions=len(sessions),
+        sessions=[
+            SessionResponse(
+                session_id=s.session_id,
+                session_name=s.session_name,
+                start_time=s.start_time,
+                doors_open_time=s.doors_open_time,
+                total_seats=s.total_seats,
+                available_seats=s.available_seats,
+                status=s.status,
+            )
+            for s in sessions
         ],
     )

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Event Details - FlashSeat</title>
+  <link rel="stylesheet" href="../assets/style.css">
+  <style>
+    .seat-map {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(50px, 1fr));
+      gap: 10px;
+      max-width: 1000px;
+      margin: 25px 0;
+    }
+    .seat {
+      width: 50px;
+      height: 50px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.95rem;
+      font-weight: bold;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .seat.available { background: #22c55e; color: white; }
+    .seat.booked { background: #ef4444; color: white; cursor: not-allowed; }
+    .seat.blocked { background: #f59e0b; color: white; cursor: not-allowed; }
+
+    .session-selector {
+      margin: 20px 0;
+    }
+
+    .back-button {
+      margin-bottom: 20px;
+    }
+
+    #sessionSelect {
+      padding: 10px;
+      font-size: 1rem;
+      width: 100%;
+      max-width: 500px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <button onclick="goBack()" class="back-button">← Back to Dashboard</button>
+    
+    <h1 id="eventTitle">Loading Event...</h1>
+    <p id="eventInfo"></p>
+
+    <!-- Session Selector -->
+    <div class="session-selector card">
+      <label for="sessionSelect"><strong>Select Show / Session:</strong></label><br><br>
+      <select id="sessionSelect" onchange="loadSeatMapForSession()">
+      </select>
+    </div>
+
+    <!-- Seat Map -->
+    <div class="card">
+      <h2>Seat Map</h2>
+      <p id="selectedSessionInfo" style="margin-bottom: 15px; font-weight: 500;"></p>
+      <div id="seatMap" class="seat-map"></div>
+    </div>
+  </div>
+
+  <script src="../js/api.js"></script>
+  <script src="event.js"></script>
+</body>
+</html>

@@ -1,0 +1,345 @@
+/* css/style.css */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    color: #333;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+/* Hero Section */
+.hero {
+    text-align: center;
+    padding: 120px 20px 80px;
+    color: white;
+}
+
+.hero h1 {
+    font-size: 3.5rem;
+    margin-bottom: 20px;
+}
+
+.hero p {
+    font-size: 1.4rem;
+    margin-bottom: 40px;
+    opacity: 0.9;
+}
+
+.btn {
+    padding: 14px 32px;
+    font-size: 1.1rem;
+    border: none;
+    border-radius: 50px;
+    cursor: pointer;
+    margin: 0 10px;
+    transition: all 0.3s;
+}
+
+.btn-primary {
+    background: white;
+    color: #667eea;
+    font-weight: bold;
+}
+
+.btn-primary:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+}
+
+.btn-outline {
+    background: transparent;
+    color: white;
+    border: 2px solid white;
+}
+
+.btn-outline:hover {
+    background: white;
+    color: #667eea;
+}
+
+/* ====================== FIX 1 ======================
+   .hidden was missing — registerForm couldn't be hidden on load */
+.hidden {
+    display: none !important;
+}
+
+/* Modal */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.6);
+    /* FIX 2: Added -webkit- prefix for Safari support */
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+/* FIX 3: Use a class to show the modal instead of inline style,
+   so display:flex is reliably applied */
+.modal.active {
+    display: flex;
+}
+
+.modal-content {
+    background: white;
+    width: 100%;
+    max-width: 420px;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0,0,0,0.3);
+    overflow: hidden;
+    /* FIX 4: Prevent modal from being cut off on small screens */
+    max-height: 90vh;
+    overflow-y: auto;
+}
+
+.modal-header {
+    padding: 25px 30px 10px;
+    text-align: center;
+    /* FIX 5: Position relative so close button can be absolute */
+    position: relative;
+}
+
+.modal-header h2 {
+    font-size: 1.8rem;
+    margin-bottom: 8px;
+}
+
+/* FIX 6: Close button styling */
+.modal-close {
+    position: absolute;
+    top: 18px;
+    right: 18px;
+    background: none;
+    border: none;
+    font-size: 1.6rem;
+    cursor: pointer;
+    color: #999;
+    line-height: 1;
+    padding: 4px 8px;
+    border-radius: 4px;
+    transition: color 0.2s, background 0.2s;
+}
+
+.modal-close:hover {
+    color: #333;
+    background: #f0f0f0;
+}
+
+.tabs {
+    display: flex;
+    background: #f8f9fa;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 16px;
+    border: none;
+    background: none;
+    font-size: 1.05rem;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.tab-btn.active {
+    background: white;
+    font-weight: 600;
+    border-bottom: 3px solid #667eea;
+}
+
+/* Form Styling */
+.auth-form {
+    padding: 30px;
+}
+
+.auth-form input {
+    width: 100%;
+    padding: 14px 16px;
+    margin-bottom: 18px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    font-size: 1rem;
+    /* FIX 7: Prevent iOS from zooming in on input focus */
+    font-size: max(16px, 1rem);
+}
+
+.auth-form input:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.auth-form button[type="submit"] {
+    width: 100%;
+    padding: 14px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background 0.2s;
+}
+
+.auth-form button[type="submit"]:hover {
+    background: #5a67d8;
+}
+
+/* FIX 8: Loading state for submit buttons */
+.auth-form button[type="submit"]:disabled {
+    background: #a0aec0;
+    cursor: not-allowed;
+}
+
+/* FIX 9: Error/success message display */
+.form-message {
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 0.95rem;
+    margin-bottom: 16px;
+    display: none;
+}
+
+.form-message.error {
+    background: #fff5f5;
+    color: #c53030;
+    border: 1px solid #fc8181;
+    display: block;
+}
+
+.form-message.success {
+    background: #f0fff4;
+    color: #276749;
+    border: 1px solid #68d391;
+    display: block;
+}
+
+/* App Shell Grid Layout */
+.app-shell {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    grid-template-rows: 70px 1fr;
+    height: 100vh;
+}
+
+.header {
+    grid-column: 1 / -1;
+    background: #1e3a8a;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 25px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+}
+
+.header-right {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+.sidebar {
+    background: #1e2937;
+    color: white;
+    padding: 20px 0;
+}
+
+.sidebar ul {
+    list-style: none;
+}
+
+.sidebar li {
+    padding: 14px 25px;
+}
+
+.sidebar li:hover, .sidebar li.active {
+    background: #334155;
+}
+
+.main-content {
+    padding: 30px;
+    background: #f8fafc;
+    overflow-y: auto;
+}
+
+.card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,0.08);
+    padding: 25px;
+    margin-bottom: 25px;
+}
+
+.btn-logout {
+    background: #ef4444;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+}
+
+/* ====================== EVENT CARDS ====================== */
+
+.event-card {
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.08);
+    padding: 20px;
+    margin-bottom: 20px;
+    transition: all 0.3s ease;
+    border: 1px solid #e2e8f0;
+}
+
+.event-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.12);
+    border-color: #667eea;
+}
+
+.event-card h4 {
+    margin-bottom: 12px;
+    color: #1e3a8a;
+    font-size: 1.35rem;
+}
+
+.event-info {
+    color: #64748b;
+    margin-bottom: 10px;
+    line-height: 1.5;
+}
+
+.event-card button {
+    margin-top: 12px;
+    padding: 10px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    transition: background 0.3s;
+}
+
+.event-card button:hover {
+    background: #5a67d8;
+}

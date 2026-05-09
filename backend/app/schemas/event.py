@@ -146,8 +146,14 @@ class SeatMapItem(BaseModel):
     seat_number: int
     section: SeatSection
     status: SessionSeatStatus
-    booked_by: Optional[uuid.UUID]    # None if not booked
-    booked_at: Optional[datetime]     # None if not booked
+    booked_by: Optional[uuid.UUID] = Field(
+        None, 
+        description="User ID who booked this seat. None if not booked."
+    )
+    booked_at: Optional[datetime] = Field(
+        None, 
+        description="Timestamp when seat was booked. None if not booked."
+    )
 
     model_config = {"from_attributes": True}
 
@@ -159,4 +165,6 @@ class SeatMapResponse(BaseModel):
     total_seats: int
     available_seats: int
     booked_seats: int
+    blocked_seats: int        
+    unavailable_seats: int  # ← ADD: Total unavailable (booked + blocked)
     seats: list[SeatMapItem]
