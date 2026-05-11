@@ -1,3 +1,5 @@
+// event.js
+
 const params = new URLSearchParams(window.location.search);
 const eventId = params.get('event_id');
 
@@ -6,13 +8,11 @@ if (!eventId) {
     window.location.href = "dashboard.html";
 }
 
-// ====================== LOAD FULL EVENT WITH SESSIONS ======================
+// ====================== LOAD EVENT & SESSIONS ======================
 async function loadEventPage() {
     try {
-        // This uses the detailed endpoint that returns sessions
         const event = await apiCall(`/events/${eventId}`);
 
-        // Update basic event info
         document.getElementById('eventTitle').textContent = event.title || "Event";
         document.getElementById('eventInfo').innerHTML = `
             ${event.venue_name || 'No venue'} • ${event.venue_city || ''}<br>
@@ -37,7 +37,7 @@ async function loadEventPage() {
             select.appendChild(option);
         });
 
-        // Load seat map for the first session by default
+        // Load first session automatically
         loadSeatMap(sessions[0].session_id);
 
     } catch (err) {
@@ -46,7 +46,7 @@ async function loadEventPage() {
     }
 }
 
-// ====================== LOAD SEAT MAP FOR SELECTED SESSION ======================
+// ====================== RENDER VISUAL SEAT GRID ======================
 async function loadSeatMap(sessionId) {
     if (!sessionId) return;
 
@@ -62,23 +62,37 @@ async function loadSeatMap(sessionId) {
 
         data.seats.forEach(seat => {
             const seatEl = document.createElement('div');
-            const statusClass = String(seat.status).toLowerCase().replace(/^sessionseatstatus\./i, '');
-
-            seatEl.className = `seat ${statusClass}`;
+            
+            // Normalize status
+            let status = String(seat.status).toLowerCase().replace(/^sessionseatstatus\./i, '');
+            
+            seatEl.className = `seat ${status}`;
             seatEl.textContent = `${seat.row_name}${seat.seat_number}`;
             seatEl.title = `${seat.row_name}${seat.seat_number} - ${seat.status}`;
-            
+
+            // Click handler - Today's Goal
+            seatEl.addEventListener('click', () => {
+                console.log(`Seat clicked → ${seat.row_name}${seat.seat_number} | Seat ID: ${seat.seat_id} | Status: ${seat.status}`);
+                
+                if (status === 'available') {
+                    alert(`✅ Seat ${seat.row_name}${seat.seat_number} selected!`);
+                    // TODO: Later - Open booking modal
+                } else {
+                    alert(`❌ Seat ${seat.row_name}${seat.seat_number} is already booked.`);
+                }
+            });
+
             seatMapDiv.appendChild(seatEl);
         });
 
     } catch (err) {
         console.error("Seat map failed:", err);
         document.getElementById('seatMap').innerHTML = 
-            `<p style="color:red; grid-column: 1 / -1;">Failed to load seat map.</p>`;
+            `<p style="color:red; grid-column: 1 / -1; text-align:center;">Failed to load seat map.</p>`;
     }
 }
 
-// ====================== HANDLE SESSION CHANGE ======================
+// ====================== SESSION CHANGE ======================
 function loadSeatMapForSession() {
     const sessionId = document.getElementById('sessionSelect').value;
     if (sessionId) loadSeatMap(sessionId);
@@ -88,5 +102,5 @@ function goBack() {
     window.location.href = "dashboard.html";
 }
 
-// ====================== START ======================
+// ====================== INIT ======================
 loadEventPage();

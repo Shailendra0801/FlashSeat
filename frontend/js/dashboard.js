@@ -19,37 +19,12 @@ document.getElementById('logoutBtn')?.addEventListener('click', () => {
 // ====================== LOAD EVENTS ======================
 async function loadEvents() {
     const eventsList = document.getElementById('eventsList');
-
-    // Safety Check
-    if (!eventsList) {
-        console.error("Element with id='eventsList' not found in HTML!");
-        return;
-    }
+    if (!eventsList) return;
 
     eventsList.innerHTML = "<p>Loading events...</p>";
 
     try {
-        const res = await fetch(`${API_BASE}/events/`, {
-            method: 'GET',
-            headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json'
-            }
-        });
-
-        if (res.status === 401) {
-            alert("Session expired. Please login again.");
-            localStorage.removeItem('access_token');
-            window.location.href = '../index.html';
-            return;
-        }
-
-        if (!res.ok) {
-            throw new Error("Failed to fetch events");
-        }
-
-        const data = await res.json();
-        console.log("Events data received:", data);
+        const data = await apiCall('/events/');
         const events = data.events || [];
 
         if (events.length === 0) {
@@ -57,27 +32,35 @@ async function loadEvents() {
             return;
         }
 
-        eventsList.innerHTML = events.map(event => `
-            <div class="event-card" style="margin-bottom: 15px; padding: 15px; border: 1px solid #ddd; border-radius: 8px;">
-                <h4>${event.title}</h4>
-                <p>
-                    ${event.category} • 
-                    ${event.venue_name || 'Venue TBD'} 
-                    ${event.venue_city ? `, ${event.venue_city}` : ''}
-                </p>
-                <p><strong>Sessions:</strong> ${event.total_sessions || 0}</p>
-                <button onclick="viewEvent('${event.event_id}')">View & Book</button>
-            </div>
-        `).join('');
+        let html = '';
+
+        events.forEach(event => {
+            html += `
+                <div class="event-card">
+                    <h4>${event.title}</h4>
+                    <p class="event-info">
+                        ${event.category} • ${event.venue_name || 'TBD'} 
+                        ${event.venue_city ? `, ${event.venue_city}` : ''}
+                    </p>
+                    <p><strong>Sessions:</strong> ${event.total_sessions || 0}</p>
+                    
+                    <button onclick="viewSeats('${event.event_id}')" class="btn-view-seats">
+                        View Seats
+                    </button>
+                </div>
+            `;
+        });
+
+        eventsList.innerHTML = html;
 
     } catch (err) {
-        console.error('Could not load events:', err);
-        eventsList.innerHTML = '<p style="color: red;">Failed to load events. Please try again.</p>';
+        console.error(err);
+        eventsList.innerHTML = '<p style="color: red;">Failed to load events.</p>';
     }
 }
 
-// ====================== VIEW EVENT ======================
-function viewEvent(eventId) {
+// ====================== VIEW SEATS ======================
+function viewSeats(eventId) {
     window.location.href = `event.html?event_id=${eventId}`;
 }
 

@@ -343,3 +343,23 @@ body {
 .event-card button:hover {
     background: #5a67d8;
 }
+
+.event-info {
+    color: #64748b;
+    margin-bottom: 12px;
+}
+
+.btn-view-seats {
+    background: #22c55e;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 10px;
+}
+
+.btn-view-seats:hover {
+    background: #16a34a;
+}
