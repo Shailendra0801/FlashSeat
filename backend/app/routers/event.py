@@ -55,98 +55,109 @@ async def create_event(
     db: AsyncSession = Depends(get_db_session),
     admin: User = Depends(is_admin),
 ):
-    # ── Create Event ──────────────────────────────────────────────────────────
-    event = Event(
-        title=payload.title,
-        description=payload.description,
-        category=payload.category,
-        venue_name=payload.venue_name,
-        venue_city=payload.venue_city,
-        created_by=admin.user_id,
-    )
-    db.add(event)
-    await db.flush()
-
-    # ── Create Seats ──────────────────────────────────────────────────────────
-    seen_seats: set[tuple[str, int]] = set()
-    for seat_in in payload.seat_layout:
-        key = (seat_in.row_name.upper(), seat_in.seat_number)
-        if key in seen_seats:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Duplicate seat in payload: Row {seat_in.row_name} Seat {seat_in.seat_number}",
+    try:
+        async with db.begin():   # ← This makes the whole operation atomic
+            # ── Create Event ─────────────────────────────────────────────────
+            event = Event(
+                title=payload.title,
+                description=payload.description,
+                category=payload.category,
+                venue_name=payload.venue_name,
+                venue_city=payload.venue_city,
+                created_by=admin.user_id,
             )
-        seen_seats.add(key)
+            db.add(event)
+            await db.flush()   # Get event_id
 
-    seats: list[Seat] = []
-    for seat_in in payload.seat_layout:
-        seat = Seat(
+            # ── Create Seats ─────────────────────────────────────────────────
+            seen_seats: set[tuple[str, int]] = set()
+            for seat_in in payload.seat_layout:
+                key = (seat_in.row_name.upper(), seat_in.seat_number)
+                if key in seen_seats:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail=f"Duplicate seat: Row {seat_in.row_name} Seat {seat_in.seat_number}",
+                    )
+                seen_seats.add(key)
+
+            seats: list[Seat] = []
+            for seat_in in payload.seat_layout:
+                seat = Seat(
+                    event_id=event.event_id,
+                    row_name=seat_in.row_name.upper(),
+                    seat_number=seat_in.seat_number,
+                    section=seat_in.section,
+                )
+                db.add(seat)
+                seats.append(seat)
+
+            await db.flush()
+            total_seats = len(seats)
+
+            # ── Create Sessions + SessionSeats ───────────────────────────────
+            created_sessions: list[EventSession] = []
+
+            for session_in in payload.sessions:
+                event_session = EventSession(
+                    event_id=event.event_id,
+                    session_name=session_in.session_name,
+                    start_time=session_in.start_time,
+                    doors_open_time=session_in.doors_open_time,
+                    total_seats=total_seats,
+                    available_seats=total_seats,
+                    status=SessionStatus.DRAFT,
+                )
+                db.add(event_session)
+                await db.flush()
+
+                for seat in seats:
+                    db.add(SessionSeat(
+                        session_id=event_session.session_id,
+                        seat_id=seat.seat_id,
+                        status=SessionSeatStatus.AVAILABLE,
+                        booked_by=None,
+                        booked_at=None,
+                        order_id=None,
+                    ))
+
+                created_sessions.append(event_session)
+
+            # No manual commit() needed inside async with db.begin()
+
+        # Transaction successful → Return response
+        return EventResponse(
             event_id=event.event_id,
-            row_name=seat_in.row_name.upper(),
-            seat_number=seat_in.seat_number,
-            section=seat_in.section,
-        )
-        db.add(seat)
-        seats.append(seat)
-
-    await db.flush()
-    total_seats = len(seats)
-
-    # ── Create Sessions + SessionSeats ────────────────────────────────────────
-    created_sessions: list[EventSession] = []
-
-    for session_in in payload.sessions:
-        event_session = EventSession(
-            event_id=event.event_id,
-            session_name=session_in.session_name,
-            start_time=session_in.start_time,
-            doors_open_time=session_in.doors_open_time,
+            title=event.title,
+            description=event.description,
+            category=event.category,
+            venue_name=event.venue_name,
+            venue_city=event.venue_city,
+            created_by=event.created_by,
+            created_at=event.created_at,
             total_seats=total_seats,
-            available_seats=total_seats,
-            status=SessionStatus.DRAFT,
+            total_sessions=len(created_sessions),
+            sessions=[
+                SessionResponse(
+                    session_id=s.session_id,
+                    session_name=s.session_name,
+                    start_time=s.start_time,
+                    doors_open_time=s.doors_open_time,
+                    total_seats=s.total_seats,
+                    available_seats=s.available_seats,
+                    status=s.status,
+                )
+                for s in created_sessions
+            ],
         )
-        db.add(event_session)
-        await db.flush()
 
-        for seat in seats:
-            db.add(SessionSeat(
-                session_id=event_session.session_id,
-                seat_id=seat.seat_id,
-                status=SessionSeatStatus.AVAILABLE,
-                booked_by=None,
-                booked_at=None,
-                order_id=None,
-            ))
-
-        created_sessions.append(event_session)
-
-    await db.commit()
-
-    return EventResponse(
-        event_id=event.event_id,
-        title=event.title,
-        description=event.description,
-        category=event.category,
-        venue_name=event.venue_name,
-        venue_city=event.venue_city,
-        created_by=event.created_by,
-        created_at=event.created_at,
-        total_seats=total_seats,
-        total_sessions=len(created_sessions),
-        sessions=[
-            SessionResponse(
-                session_id=s.session_id,
-                session_name=s.session_name,
-                start_time=s.start_time,
-                doors_open_time=s.doors_open_time,
-                total_seats=s.total_seats,
-                available_seats=s.available_seats,
-                status=s.status,
-            )
-            for s in created_sessions
-        ],
-    )
-
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"Event creation failed: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create event"
+        )
 
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /events/{event_id}/generate-seats — Admin: Add seats to existing event

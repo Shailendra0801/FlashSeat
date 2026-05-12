@@ -84,6 +84,24 @@
     </div>
   </div>
 
+  <!-- Waiting Room Screen -->
+  <div id="waitingRoom" class="waiting-room hidden">
+      <div class="waiting-content">
+          <h2>⏳ You are in the Waiting Room</h2>
+          <p id="queueMessage">Please wait while we find a spot for you...</p>
+          
+          <div class="queue-position">
+              <h1 id="queuePosition">45</h1>
+              <p>Your Position</p>
+          </div>
+
+          <p id="estimatedWait">Estimated wait: ~2 minutes</p>
+          
+          <div class="loader"></div>
+          <button onclick="goBack()" style="margin-top: 30px;">Leave Queue</button>
+      </div>
+  </div>
+
   <script src="../js/api.js"></script>
   <script src="event.js"></script>
 </body>
