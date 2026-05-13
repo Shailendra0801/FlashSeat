@@ -26,12 +26,12 @@ async def get_redis_client() -> aioredis.Redis:
     return _redis_client
 
 
-def get_redis():
+async def get_redis():
     """
     FastAPI dependency.
     We keep it sync so it works cleanly with Depends().
     """
-    return get_redis_client()
+    return await get_redis_client()
 
 
 async def close_redis() -> None:
@@ -65,6 +65,14 @@ def user_session_key(event_id: str, user_id: str) -> str:
 
 
 # Optional: Health check
+def seat_lock_key(session_id: str, seat_id: str) -> str:
+    """Distributed seat lock key.
+
+    We lock per (session_id, seat_id) because SessionSeat is keyed by that pair.
+    """
+    return f"seat:{session_id}:{seat_id}"
+
+
 async def ping_redis() -> bool:
     """Test Redis connection."""
     try:
@@ -72,3 +80,4 @@ async def ping_redis() -> bool:
         return await client.ping()
     except Exception:
         return False
+

@@ -10,11 +10,12 @@ Endpoints:
 
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.dependencies import is_admin
+from app.core.dependencies import get_current_user, is_admin
+from app.core.redis import get_redis, seat_lock_key
 from app.database import get_db_session
 from app.models.enums import SessionSeatStatus, SessionStatus
 from app.models.event import Event
@@ -23,6 +24,7 @@ from app.models.seat import Seat
 from app.models.session_seat import SessionSeat
 from app.models.user import User
 from app.schemas.event import (
+
     EventCreate,
     EventListItem,
     EventListResponse,
@@ -33,6 +35,7 @@ from app.schemas.event import (
     SeatMapResponse,
     SessionResponse,
 )
+
 
 router = APIRouter(
     prefix="/events",
@@ -442,6 +445,67 @@ async def get_seat_map(
 # GET /events/{event_id} — Get full event details with sessions
 # ─────────────────────────────────────────────────────────────────────────────
 
+@router.post(
+    "/seats/{seat_id}/lock",
+    status_code=status.HTTP_200_OK,
+    summary="Lock a seat using Redis (atomic distributed lock)",
+)
+async def lock_seat(
+    seat_id: uuid.UUID,
+    background_tasks: BackgroundTasks,
+    session_id: uuid.UUID = Query(..., description="Session ID for this seat lock"),
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+    redis=Depends(get_redis),
+):
+    """Acquire a Redis lock for a specific (session_id, seat_id).
+
+    - Redis: SET seat:{session_id}:{seat_id} {user_id} NX EX 300
+    - If acquired (OK): enqueue DB update to RESERVED.
+    - If not acquired (None): reject with 409.
+    """
+
+    lock_key = seat_lock_key(str(session_id), str(seat_id))
+
+    result = await redis.set(
+        lock_key,
+        str(current_user.user_id),
+        nx=True,
+        ex=300,
+    )
+
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Seat is already locked or sold",
+        )
+
+    async def _mark_reserved():
+        # Background task: mark the SessionSeat as RESERVED if still present.
+        async with db.begin():
+            q = select(SessionSeat).where(
+                SessionSeat.session_id == session_id,
+                SessionSeat.seat_id == seat_id,
+            )
+            res = await db.execute(q)
+            session_seat = res.scalar_one_or_none()
+            if session_seat is None:
+                return
+            session_seat.status = SessionSeatStatus.RESERVED
+            session_seat.booked_by = current_user.user_id
+            # Note: booked_at/order_id are not set here; those belong to confirmation.
+
+    background_tasks.add_task(_mark_reserved)
+
+    return {
+        "status": "locked",
+        "seat_id": seat_id,
+        "session_id": session_id,
+        "locked_by": current_user.user_id,
+        "ttl_seconds": 300,
+    }
+
+
 @router.get(
     "/{event_id}",
     response_model=EventResponse,
@@ -451,6 +515,7 @@ async def get_event_detail(
     event_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_session),
 ):
+
     """
     Returns full event details along with all its sessions.
     Useful for frontend event detail / seat selection page.
@@ -486,7 +551,7 @@ async def get_event_detail(
         venue_city=event.venue_city,
         created_by=event.created_by,
         created_at=event.created_at,
-        total_seats=0,  # Will be calculated from seats or first session
+        total_seats=sessions[0].total_seats if sessions else 0,
         total_sessions=len(sessions),
         sessions=[
             SessionResponse(
