@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Seat Map - FlashSeat</title>
-  <link rel="stylesheet" href="../assets/style.css">
+  <link rel="stylesheet" href="../css/style.css">
   <style>
     .seat-grid {
       display: grid;
@@ -36,12 +36,30 @@
       color: white; 
       cursor: not-allowed; 
     }
-    .seat.blocked { 
-      background: #f59e0b; 
-      color: white; 
-      cursor: not-allowed; 
+.seat.blocked { 
+      background: #f59e0b;
+      color: white;
+      cursor: not-allowed;
     }
-    .seat:hover.available {
+
+    /* TODO: Lock UI states */
+    .seat.unavailable {
+      background: #6b7280;
+      color: white;
+      cursor: not-allowed;
+    }
+
+    .seat.locked-by-you {
+      background: #facc15;
+      color: #111827;
+      cursor: not-allowed;
+      font-size: 0.75rem;
+      line-height: 1.05;
+      text-align: center;
+      padding: 6px;
+    }
+
+    .seat:hover.available { 
       transform: scale(1.12);
       box-shadow: 0 6px 15px rgba(34, 197, 94, 0.4);
     }
@@ -103,6 +121,6 @@
   </div>
 
   <script src="../js/api.js"></script>
-  <script src="event.js"></script>
+  <script src="../js/event.js"></script>
 </body>
 </html>
