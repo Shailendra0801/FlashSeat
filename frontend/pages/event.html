@@ -100,7 +100,25 @@
       <p id="selectedSessionInfo" style="margin-bottom: 15px; font-weight: 500; color: #334155;"></p>
       <div id="seatMap" class="seat-grid"></div>
     </div>
+
+    <!-- Cart / Checkout -->
+    <div class="card">
+      <h2>Cart</h2>
+      <p id="cartSubtitle" style="margin-bottom: 10px; color:#334155; font-weight:500;">
+        No locked seats selected.
+      </p>
+
+      <div id="cartSeats" class="cart-seats" aria-live="polite"></div>
+
+      <div style="display:flex; gap:12px; align-items:center; margin-top: 16px;">
+        <button id="checkoutBtn" class="btn-checkout" onclick="checkoutFromCart()" disabled>
+          Checkout
+        </button>
+        <div id="cartMessage" class="cart-message" style="flex:1;"></div>
+      </div>
+    </div>
   </div>
+
 
   <!-- Waiting Room Screen -->
   <div id="waitingRoom" class="waiting-room hidden">

@@ -25,6 +25,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from decimal import Decimal
+
 from app.models.base import Base, TimestampMixin
 
 
@@ -64,7 +66,7 @@ class OrderItem(Base, TimestampMixin):
     )
 
     # Per-seat pricing (important: seats in different sections have different prices)
-    unit_price: Mapped[float] = mapped_column(
+    unit_price: Mapped[Decimal] = mapped_column(
         Numeric(10, 2),
         nullable=False,
         default=0.00,

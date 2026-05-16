@@ -28,6 +28,8 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from decimal import Decimal
+
 from app.models.base import Base, TimestampMixin
 from app.models.enums import OrderStatus
 
@@ -68,7 +70,7 @@ class Order(Base, TimestampMixin):
 
     # Pricing fields stubbed in now for future payment phase.
     # Storing as Numeric(10, 2) for monetary precision — never use Float for money.
-    total_amount: Mapped[float] = mapped_column(
+    total_amount: Mapped[Decimal] = mapped_column(
         Numeric(10, 2),
         nullable=False,
         default=0.00,

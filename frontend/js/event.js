@@ -22,6 +22,14 @@ let pollInterval = null;
 let seatPollInterval = null;
 let currentSessionId = null;
 
+// ====================== CART STATE ======================
+// Holds locked physical seat IDs (Seat.seat_id)
+const cartSeatIds = new Set();
+let checkoutInProgress = false;
+let checkoutPendingReconnect = false;
+
+
+
 
 // ====================== API HELPER ======================
 async function apiCall(path, options = {}) {
@@ -47,6 +55,96 @@ async function apiCall(path, options = {}) {
 
     return res.json();
 }
+
+// ====================== CART UI HELPERS ======================
+function getSeatByIdFromDOM(seatId) {
+    // seat elements have no data attributes currently, so we locate by title/text.
+    // We'll reconcile using current DOM rendering by seat text matching (row+number).
+    // Fallback: if we can't find, reconciliation still updates UI list.
+    const seatGrid = document.getElementById('seatMap');
+    if (!seatGrid) return null;
+    const all = Array.from(seatGrid.querySelectorAll('.seat'));
+    // seat text is row+seat_number; seatId not present in DOM.
+    // So just return first match if title includes 'seat_id' (not present). We'll avoid heavy matching.
+    return all.find(el => el.dataset && el.dataset.seatId === String(seatId)) || null;
+}
+
+function renderCart() {
+    const cartSeatsDiv = document.getElementById('cartSeats');
+    const cartSubtitle = document.getElementById('cartSubtitle');
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    const cartMessage = document.getElementById('cartMessage');
+
+    if (!cartSeatsDiv || !cartSubtitle || !checkoutBtn || !cartMessage) return;
+
+    cartSeatsDiv.innerHTML = '';
+    cartMessage.textContent = '';
+
+    const ids = Array.from(cartSeatIds);
+
+    if (ids.length === 0) {
+        cartSubtitle.textContent = 'No locked seats selected.';
+        checkoutBtn.disabled = true;
+        return;
+    }
+
+    cartSubtitle.textContent = `Locked seats (${ids.length})`;
+    checkoutBtn.disabled = checkoutInProgress;
+
+    // Render seats from current DOM labels when possible.
+    // seat render sets: seatEl.dataset.seatId and seatEl.textContent/title.
+    const seatEls = Array.from(document.getElementById('seatMap')?.querySelectorAll('.seat') || []);
+    const labelBySeatId = new Map();
+
+    seatEls.forEach(el => {
+        const sid = el.dataset?.seatId;
+        if (!sid) return;
+
+        const raw = (el.textContent || '').trim();
+        const label = (raw && raw !== 'Locked') ? raw : (el.title || raw);
+        if (label) labelBySeatId.set(sid, label);
+    });
+
+    ids.forEach(seatId => {
+        const p = document.createElement('div');
+        p.className = 'cart-seat';
+        const label = labelBySeatId.get(String(seatId));
+        p.textContent = label ? label : `Seat ${seatId}`;
+        cartSeatsDiv.appendChild(p);
+    });
+}
+
+
+function elToTextHint(el) {
+    if (!el) return null;
+    return (el.textContent || '').trim();
+}
+
+function reconcileCartAfterSeatRefresh() {
+    const seatMap = document.getElementById('seatMap');
+    if (!seatMap) return;
+
+    // Rebuild cart from DOM markers.
+    const lockedEls = Array.from(seatMap.querySelectorAll('.seat.locked-by-you'));
+    const newSet = new Set();
+    lockedEls.forEach(el => {
+        const sid = el.dataset?.seatId;
+        if (sid) newSet.add(sid);
+    });
+
+    const changed = newSet.size !== cartSeatIds.size || Array.from(newSet).some(sid => !cartSeatIds.has(sid));
+    if (changed) {
+        cartSeatIds.clear();
+        newSet.forEach(sid => cartSeatIds.add(sid));
+        renderCart();
+    } else {
+        renderCart();
+    }
+}
+
+
+
+
 
 
 // ====================== ENTER EVENT (QUEUE CHECK) ======================
@@ -152,6 +250,12 @@ async function loadSeatMap(sessionId) {
     currentSessionId = sessionId;
 
     const infoEl = document.getElementById('selectedSessionInfo');
+
+    // While checkout is in progress, avoid flickering seat states due to polling.
+    if (checkoutInProgress) {
+        return;
+    }
+
     const select = document.getElementById('sessionSelect');
     infoEl.textContent =
         `Showing seats for: ${select.options[select.selectedIndex]?.text || ''}`;
@@ -169,14 +273,23 @@ async function loadSeatMap(sessionId) {
                 .toLowerCase()
                 .replace(/^sessionseatstatus\./i, '');
 
-            // Map all unavailable states to single CSS class
-            const domStatus = ['reserved', 'booked', 'blocked'].includes(rawStatus)
-                ? 'unavailable'
-                : rawStatus;
+            // Map backend seat state to UI CSS classes
+            // - available      -> available
+            // - reserved/booked/blocked -> unavailable (unless booked should appear as sold)
+            // We treat BOOKED as sold for better UX.
+            let domStatus = rawStatus;
+            if (['reserved', 'blocked'].includes(rawStatus)) {
+                domStatus = 'unavailable';
+            } else if (rawStatus === 'booked') {
+                domStatus = 'sold';
+            }
+
 
             seatEl.className = `seat ${domStatus}`;
+            seatEl.dataset.seatId = String(seat.seat_id);
             seatEl.textContent = `${seat.row_name}${seat.seat_number}`;
             seatEl.title = `${seat.row_name}${seat.seat_number} - ${rawStatus}`;
+
 
             // Only available seats are clickable
             if (rawStatus === 'available') {
@@ -209,12 +322,17 @@ async function handleSeatClick(seatEl, seat, sessionId) {
         clone.className = 'seat locked-by-you';
         clone.textContent = 'Locked';
         clone.title = `${seat.row_name}${seat.seat_number} - locked by you`;
+
+        // Add to cart
+        cartSeatIds.add(seat.seat_id);
+        renderCart();
     } catch (err) {
         clone.className = 'seat unavailable';
         clone.textContent = `${seat.row_name}${seat.seat_number}`;
         clone.title = `${seat.row_name}${seat.seat_number} - unavailable`;
     }
 }
+
 
 
 // ====================== SEAT POLLING ======================
@@ -227,13 +345,17 @@ function startSeatPolling() {
 
     seatPollInterval = setInterval(async () => {
         if (!currentSessionId) return;
+        if (checkoutInProgress) return;
         try {
+            // Seat map reload will re-render seats; cart reconciliation runs inside renderCartWithReconciliation().
             await loadSeatMap(currentSessionId);
+            reconcileCartAfterSeatRefresh();
         } catch (e) {
             console.error('Seat polling failed:', e);
         }
     }, 5000);
 }
+
 
 
 // ====================== SESSION CHANGE ======================
@@ -247,6 +369,78 @@ function loadSeatMapForSession() {
 }
 
 
+// ====================== CHECKOUT ======================
+async function checkoutFromCart() {
+    const checkoutBtn = document.getElementById('checkoutBtn');
+    const cartMessage = document.getElementById('cartMessage');
+
+    if (!currentSessionId) {
+        cartMessage.textContent = 'No session selected.';
+        return;
+    }
+
+    const seatIds = Array.from(cartSeatIds);
+    if (seatIds.length === 0) {
+        cartMessage.textContent = 'No locked seats selected.';
+        return;
+    }
+
+    if (checkoutInProgress) return;
+    checkoutInProgress = true;
+    checkoutPendingReconnect = false;
+
+    if (checkoutBtn) checkoutBtn.disabled = true;
+    cartMessage.textContent = 'Processing checkout...';
+
+    try {
+        const payload = {
+            session_id: currentSessionId,
+            seat_ids: seatIds,
+        };
+
+        const data = await apiCall('/orders', {
+            method: 'POST',
+            body: JSON.stringify(payload),
+        });
+
+        // Backend returns order info if successful.
+        // Update UI: turn locked seats into sold/red.
+        const seatMap = document.getElementById('seatMap');
+        const seatEls = seatMap ? Array.from(seatMap.querySelectorAll('.seat')) : [];
+
+        seatEls.forEach(el => {
+            const sid = el.dataset?.seatId;
+            if (!sid) return;
+            if (cartSeatIds.has(sid)) {
+                el.classList.remove('locked-by-you');
+                el.classList.add('sold');
+                el.textContent = (el.textContent && el.textContent.trim()) ? el.textContent : 'Sold';
+                el.title = 'Sold';
+            }
+        });
+
+        // Clear cart
+        cartSeatIds.clear();
+        renderCart();
+
+        cartMessage.textContent = 'Checkout successful! Your seats are confirmed.';
+
+        // Reload seat map after a short delay to sync statuses.
+        setTimeout(() => {
+            if (!checkoutInProgress) return;
+        }, 0);
+
+    } catch (err) {
+        cartMessage.textContent = `Checkout failed: ${err.message}`;
+    } finally {
+        checkoutInProgress = false;
+        // Sync seats after checkout attempt.
+        try {
+            if (currentSessionId) loadSeatMap(currentSessionId);
+        } catch (_) {}
+    }
+}
+
 // ====================== GO BACK ======================
 function goBack() {
     if (pollInterval) clearInterval(pollInterval);
@@ -254,6 +448,7 @@ function goBack() {
     notifyLeave();
     window.location.href = "dashboard.html";
 }
+
 
 
 // ====================== NOTIFY BACKEND ON LEAVE ======================

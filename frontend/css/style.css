@@ -402,3 +402,48 @@ body {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
 }
+
+/* ====================== Seat Map (Cart/Checkout) ====================== */
+
+/* Sold seats (Red) */
+.seat.sold {
+    background: #ef4444;
+    color: #fff;
+    cursor: not-allowed;
+}
+
+.btn-checkout {
+    background: #3b82f6;
+    color: #fff;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 8px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.btn-checkout:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.cart-seats {
+    margin-top: 10px;
+    min-height: 20px;
+}
+
+.cart-seat {
+    padding: 8px 10px;
+    border-radius: 8px;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.cart-message {
+    font-weight: 600;
+    color: #0f172a;
+}
+

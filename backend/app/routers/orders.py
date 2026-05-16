@@ -18,10 +18,77 @@ from app.models.seat import Seat
 
 from app.models.user import User
 from app.schemas.order import CreateOrderRequest, CreateOrderResponse, OrderResponse
+from app.schemas.orders_history import MyOrdersResponse, OrderHistoryResponse, OrderHistoryItemResponse
 
-from sqlalchemy.exc import IntegrityError, OperationalError
+from sqlalchemy.exc import IntegrityError, OperationalError  # noqa: F811
 
 router = APIRouter(prefix="/orders", tags=["orders"])
+
+
+@router.get(
+    "/me",
+    response_model=MyOrdersResponse,
+    summary="Get current user's confirmed (and failed/pending) orders",
+)
+async def my_orders(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    """Order history for the authenticated user.
+
+    Frontend expects GET /orders/me and then reads:
+      data?.orders || data || []
+
+    We return { orders: [...] } where each order includes:
+      - order_id, status, created_at
+      - items: [{ seat_label, order_item_id }]
+    """
+
+    q = (
+        select(Order)
+        .where(Order.user_id == current_user.user_id)
+        .order_by(Order.created_at.desc())
+    )
+    res = await db.execute(q)
+    orders: list[Order] = res.scalars().all()
+
+    if not orders:
+        return MyOrdersResponse(orders=[])
+
+    order_ids = [o.order_id for o in orders]
+
+    # Fetch items + seat labels in one query.
+    items_q = (
+        select(OrderItem)
+        .where(OrderItem.order_id.in_(order_ids))
+        .order_by(OrderItem.created_at)
+    )
+    items_res = await db.execute(items_q)
+    items: list[OrderItem] = items_res.scalars().all()
+
+    items_by_order_id: dict[str, list[OrderHistoryItemResponse]] = {}
+    for it in items:
+        oid = str(it.order_id)
+        items_by_order_id.setdefault(oid, []).append(
+            OrderHistoryItemResponse(
+                order_item_id=it.order_item_id,
+                seat_label=it.seat_label,
+            )
+        )
+
+    orders_resp: list[OrderHistoryResponse] = []
+    for o in orders:
+        orders_resp.append(
+            OrderHistoryResponse(
+                order_id=o.order_id,
+                status=o.status.value,
+                created_at=o.created_at,
+                items=items_by_order_id.get(str(o.order_id), []),
+            )
+        )
+
+    return MyOrdersResponse(orders=orders_resp)
+
 
 
 class _SeatLockValidationError(HTTPException):
