@@ -11,6 +11,8 @@ from app.routers import auth, event, queue, orders
 
 from app.core.redis import close_redis
 from app.core.queue_manager import listen_for_expired_sessions
+from app.core.seat_lock_cleanup import cleanup_abandoned_seat_locks_loop
+
 
 
 @asynccontextmanager
@@ -22,16 +24,26 @@ async def lifespan(app: FastAPI):
     # Start background task — catches dirty disconnects via Redis key expiry
     cleanup_task = asyncio.create_task(listen_for_expired_sessions())
 
+    # Start periodic cleanup for abandoned seat locks
+    seat_lock_cleanup_task = asyncio.create_task(cleanup_abandoned_seat_locks_loop())
+
+
     yield
 
     # ── Shutdown ──────────────────────────────────────────────────────────────
     cleanup_task.cancel()
+    seat_lock_cleanup_task.cancel()
     try:
         await cleanup_task
     except asyncio.CancelledError:
         pass
+    try:
+        await seat_lock_cleanup_task
+    except asyncio.CancelledError:
+        pass
 
     await close_redis()
+
 
 
 app = FastAPI(
