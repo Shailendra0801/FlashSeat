@@ -24,7 +24,6 @@ from app.models.seat import Seat
 from app.models.session_seat import SessionSeat
 from app.models.user import User
 from app.schemas.event import (
-
     EventCreate,
     EventListItem,
     EventListResponse,
@@ -59,75 +58,75 @@ async def create_event(
     admin: User = Depends(is_admin),
 ):
     try:
-        async with db.begin():   # ← This makes the whole operation atomic
-            # ── Create Event ─────────────────────────────────────────────────
-            event = Event(
-                title=payload.title,
-                description=payload.description,
-                category=payload.category,
-                venue_name=payload.venue_name,
-                venue_city=payload.venue_city,
-                created_by=admin.user_id,
+        # ── Create Event ──────────────────────────────────────────────────────
+        event = Event(
+            title=payload.title,
+            description=payload.description,
+            category=payload.category,
+            venue_name=payload.venue_name,
+            venue_city=payload.venue_city,
+            created_by=admin.user_id,
+        )
+        db.add(event)
+        await db.flush()  # Get event_id
+
+        # ── Create Seats ──────────────────────────────────────────────────────
+        seen_seats: set[tuple[str, int]] = set()
+        for seat_in in payload.seat_layout:
+            key = (seat_in.row_name.upper(), seat_in.seat_number)
+            if key in seen_seats:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Duplicate seat: Row {seat_in.row_name} Seat {seat_in.seat_number}",
+                )
+            seen_seats.add(key)
+
+        seats: list[Seat] = []
+        for seat_in in payload.seat_layout:
+            seat = Seat(
+                event_id=event.event_id,
+                row_name=seat_in.row_name.upper(),
+                seat_number=seat_in.seat_number,
+                section=seat_in.section,
             )
-            db.add(event)
-            await db.flush()   # Get event_id
+            db.add(seat)
+            seats.append(seat)
 
-            # ── Create Seats ─────────────────────────────────────────────────
-            seen_seats: set[tuple[str, int]] = set()
-            for seat_in in payload.seat_layout:
-                key = (seat_in.row_name.upper(), seat_in.seat_number)
-                if key in seen_seats:
-                    raise HTTPException(
-                        status_code=status.HTTP_400_BAD_REQUEST,
-                        detail=f"Duplicate seat: Row {seat_in.row_name} Seat {seat_in.seat_number}",
-                    )
-                seen_seats.add(key)
+        await db.flush()
+        total_seats = len(seats)
 
-            seats: list[Seat] = []
-            for seat_in in payload.seat_layout:
-                seat = Seat(
-                    event_id=event.event_id,
-                    row_name=seat_in.row_name.upper(),
-                    seat_number=seat_in.seat_number,
-                    section=seat_in.section,
-                )
-                db.add(seat)
-                seats.append(seat)
+        # ── Create Sessions + SessionSeats ────────────────────────────────────
+        created_sessions: list[EventSession] = []
 
+        for session_in in payload.sessions:
+            event_session = EventSession(
+                event_id=event.event_id,
+                session_name=session_in.session_name,
+                start_time=session_in.start_time,
+                doors_open_time=session_in.doors_open_time,
+                total_seats=total_seats,
+                available_seats=total_seats,
+                status=SessionStatus.DRAFT,
+            )
+            db.add(event_session)
             await db.flush()
-            total_seats = len(seats)
 
-            # ── Create Sessions + SessionSeats ───────────────────────────────
-            created_sessions: list[EventSession] = []
+            for seat in seats:
+                db.add(SessionSeat(
+                    session_id=event_session.session_id,
+                    seat_id=seat.seat_id,
+                    status=SessionSeatStatus.AVAILABLE,
+                    booked_by=None,
+                    booked_at=None,
+                    order_id=None,
+                ))
 
-            for session_in in payload.sessions:
-                event_session = EventSession(
-                    event_id=event.event_id,
-                    session_name=session_in.session_name,
-                    start_time=session_in.start_time,
-                    doors_open_time=session_in.doors_open_time,
-                    total_seats=total_seats,
-                    available_seats=total_seats,
-                    status=SessionStatus.DRAFT,
-                )
-                db.add(event_session)
-                await db.flush()
+            created_sessions.append(event_session)
 
-                for seat in seats:
-                    db.add(SessionSeat(
-                        session_id=event_session.session_id,
-                        seat_id=seat.seat_id,
-                        status=SessionSeatStatus.AVAILABLE,
-                        booked_by=None,
-                        booked_at=None,
-                        order_id=None,
-                    ))
+        # FIX: Manual commit — no async with db.begin() wrapper
+        await db.commit()
 
-                created_sessions.append(event_session)
-
-            # No manual commit() needed inside async with db.begin()
-
-        # Transaction successful → Return response
+        # ── Return Response ───────────────────────────────────────────────────
         return EventResponse(
             event_id=event.event_id,
             title=event.title,
@@ -154,13 +153,16 @@ async def create_event(
         )
 
     except HTTPException:
+        await db.rollback()
         raise
     except Exception as e:
+        await db.rollback()
         print(f"Event creation failed: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create event"
         )
+
 
 # ─────────────────────────────────────────────────────────────────────────────
 # POST /events/{event_id}/generate-seats — Admin: Add seats to existing event
@@ -403,14 +405,14 @@ async def get_seat_map(
     if not rows:
         raise HTTPException(status_code=404, detail="No seats found for this session")
 
-    # ── Count different statuses ─────────────────────────────────────────────
+    # ── Count different statuses ──────────────────────────────────────────────
     booked_count = 0
     blocked_count = 0
 
     for ss, _ in rows:
         if ss.status == SessionSeatStatus.BOOKED:
             booked_count += 1
-        elif ss.status == SessionSeatStatus.BLOCKED:   # or RESERVED, MAINTENANCE etc.
+        elif ss.status == SessionSeatStatus.BLOCKED:
             blocked_count += 1
 
     total_unavailable = booked_count + blocked_count
@@ -422,9 +424,9 @@ async def get_seat_map(
         session_name=session.session_name,
         total_seats=session.total_seats,
         available_seats=session.available_seats,
-        booked_seats=booked_count,           
-        blocked_seats=blocked_count,         
-        unavailable_seats=total_unavailable, # Total unavailable (booked + blocked)
+        booked_seats=booked_count,
+        blocked_seats=blocked_count,
+        unavailable_seats=total_unavailable,
         seats=[
             SeatMapItem(
                 session_seat_id=ss.session_seat_id,
@@ -439,10 +441,10 @@ async def get_seat_map(
             for ss, seat in rows
         ],
     )
-    
-    
+
+
 # ─────────────────────────────────────────────────────────────────────────────
-# GET /events/{event_id} — Get full event details with sessions
+# POST /events/seats/{seat_id}/lock — Lock a seat via Redis
 # ─────────────────────────────────────────────────────────────────────────────
 
 @router.post(
@@ -482,7 +484,7 @@ async def lock_seat(
 
     async def _mark_reserved():
         # Background task: mark the SessionSeat as RESERVED if still present.
-        async with db.begin():
+        async with db.begin_nested():
             q = select(SessionSeat).where(
                 SessionSeat.session_id == session_id,
                 SessionSeat.seat_id == seat_id,
@@ -493,7 +495,6 @@ async def lock_seat(
                 return
             session_seat.status = SessionSeatStatus.RESERVED
             session_seat.booked_by = current_user.user_id
-            # Note: booked_at/order_id are not set here; those belong to confirmation.
 
     background_tasks.add_task(_mark_reserved)
 
@@ -506,6 +507,10 @@ async def lock_seat(
     }
 
 
+# ─────────────────────────────────────────────────────────────────────────────
+# GET /events/{event_id} — Get full event details with sessions
+# ─────────────────────────────────────────────────────────────────────────────
+
 @router.get(
     "/{event_id}",
     response_model=EventResponse,
@@ -515,7 +520,6 @@ async def get_event_detail(
     event_id: uuid.UUID,
     db: AsyncSession = Depends(get_db_session),
 ):
-
     """
     Returns full event details along with all its sessions.
     Useful for frontend event detail / seat selection page.

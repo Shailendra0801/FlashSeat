@@ -74,7 +74,7 @@ async def cleanup_abandoned_seat_locks_once() -> None:
     skipped = 0
 
     async with AsyncSessionFactory() as db:
-        for key in _iter_redis_keys_by_scan(
+        async for key in _iter_redis_keys_by_scan(
             redis,
             match_pattern=f"{SEAT_LOCK_KEY_PREFIX}*",
             scan_count=SEAT_LOCK_SCAN_COUNT,

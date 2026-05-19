@@ -87,7 +87,7 @@ async def cleanup_abandoned_seat_locks_once() -> None:
     async with AsyncSessionFactory() as db:
         # No explicit begin() here: updates will be committed via explicit db.commit().
         # We'll commit once at the end for performance.
-        for key in _iter_redis_keys_by_scan(
+        async for key in _iter_redis_keys_by_scan(
             redis,
             match_pattern=f"{SEAT_LOCK_KEY_PREFIX}*",
             scan_count=SEAT_LOCK_SCAN_COUNT,

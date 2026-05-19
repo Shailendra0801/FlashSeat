@@ -1,6 +1,4 @@
 // event.js
-
-const API_BASE = "http://127.0.0.1:8000";
 const token = localStorage.getItem('access_token');
 
 // ── Auth guard ────────────────────────────────────────────────────────────────

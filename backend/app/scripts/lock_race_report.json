@@ -1,0 +1,340 @@
+{
+  "base_url": "http://127.0.0.1:8000",
+  "event_id": "1c17ef64-0c99-4110-b780-9753e178c856",
+  "session_id": "670650ff-1ece-4cc8-9993-1b444e72e298",
+  "seat_id": "03135532-f405-4b6f-b06c-4e80baaf3b8e",
+  "concurrent_users": 50,
+  "phase1_delay_ms": 0,
+  "total_duration_ms": 6156.0,
+  "summary": {
+    "successes": 1,
+    "failures": 49
+  },
+  "latency_ms": {
+    "min": 3890.0,
+    "avg": 4858.14,
+    "median": 5015.0,
+    "p95": 6000.0,
+    "max": 6141.0
+  },
+  "phase2_status_histogram": {
+    "201": 1,
+    "409": 49
+  },
+  "phase1_status_histogram": {
+    "200": 2,
+    "409": 48
+  },
+  "failure_detail_histogram": [
+    [
+      "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      48
+    ],
+    [
+      "One or more seats were already booked",
+      1
+    ]
+  ],
+  "results_sample": [
+    {
+      "idx": 0,
+      "ok": true,
+      "phase1_status": 200,
+      "phase2_status": 201,
+      "latency_ms": 4109.000000011292,
+      "error_detail": null,
+      "phase1_body": {
+        "status": "locked",
+        "seat_id": "03135532-f405-4b6f-b06c-4e80baaf3b8e",
+        "session_id": "670650ff-1ece-4cc8-9993-1b444e72e298",
+        "locked_by": "dcea9a44-dea1-4e66-a584-bd4637c03a28",
+        "ttl_seconds": 300
+      },
+      "phase2_body": {
+        "order": {
+          "order_id": "9822eb03-556d-4301-b265-ee387985c7a9",
+          "status": "confirmed",
+          "failure_reason": null,
+          "created_at": "2026-05-18T19:43:42.647521Z"
+        }
+      }
+    },
+    {
+      "idx": 1,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5625.0,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 2,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5875.0,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 3,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5000.0,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 4,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5875.0,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 5,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 4109.000000011292,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 6,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5014.999999999418,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 7,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 4125.0,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 8,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5014.999999999418,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 9,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5014.999999999418,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 10,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 4139.999999999418,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 11,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 4156.000000002678,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 12,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 4156.000000002678,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 13,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 4125.0,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 14,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 3953.0000000086147,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 15,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 6000.0,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 16,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 4139.999999999418,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 17,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5047.000000005937,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 18,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5047.000000005937,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    },
+    {
+      "idx": 19,
+      "ok": false,
+      "phase1_status": 409,
+      "phase2_status": 409,
+      "latency_ms": 5047.000000005937,
+      "error_detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e",
+      "phase1_body": {
+        "detail": "Seat is already locked or sold"
+      },
+      "phase2_body": {
+        "detail": "Seat lock not owned by user for seat_id=03135532-f405-4b6f-b06c-4e80baaf3b8e"
+      }
+    }
+  ],
+  "results_count": 50,
+  "db_verification": {
+    "orders_in_session": 1,
+    "session_seat_rows_for_target": 1,
+    "order_items_for_target": 1,
+    "seat_statuses": [
+      "reserved"
+    ],
+    "oversold": false,
+    "expected_order_items": 1
+  }
+}
