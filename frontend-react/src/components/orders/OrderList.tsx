@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { apiRequest } from '../../api/client';
 import { OrderCard } from './OrderCard';
 import type { OrderHistory } from '../../types';
@@ -8,19 +8,21 @@ export function OrderList() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
-    async function load() {
-      try {
-        const data = await apiRequest<{ orders: OrderHistory[] }>('/orders/me');
-        setOrders(data.orders || []);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load orders');
-      } finally {
-        setLoading(false);
-      }
+  const loadOrders = useCallback(async () => {
+    try {
+      const data = await apiRequest<{ orders: OrderHistory[] }>('/orders/me');
+      setOrders(data.orders || []);
+      setError('');
+    } catch (err: any) {
+      setError(err.message || 'Failed to load orders');
+    } finally {
+      setLoading(false);
     }
-    load();
   }, []);
+
+  useEffect(() => {
+    loadOrders();
+  }, [loadOrders]);
 
   if (loading) {
     return <div className="loading-spinner" />;
@@ -33,6 +35,7 @@ export function OrderList() {
   if (orders.length === 0) {
     return (
       <div className="empty-state">
+        <div className="empty-icon">&#128179;</div>
         <p>No orders yet. Book some seats to get started!</p>
       </div>
     );
@@ -41,7 +44,7 @@ export function OrderList() {
   return (
     <div className="order-list">
       {orders.map((order) => (
-        <OrderCard key={order.order_id} order={order} />
+        <OrderCard key={order.order_id} order={order} onCancelled={loadOrders} />
       ))}
     </div>
   );

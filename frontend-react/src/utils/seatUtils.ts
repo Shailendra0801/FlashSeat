@@ -8,7 +8,8 @@ export function getSeatClassName(
   const status = seat.status.toLowerCase() as SeatStatus;
   switch (status) {
     case 'available':
-      return 'seat available';
+      // Use section-based color for available seats
+      return `seat available section-${seat.section}`;
     case 'reserved':
       return 'seat unavailable';
     case 'booked':

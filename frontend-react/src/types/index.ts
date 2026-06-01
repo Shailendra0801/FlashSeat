@@ -93,3 +93,39 @@ export interface QueueStatus {
   queue_position?: number;
   estimated_wait_seconds?: number;
 }
+
+// Admin types
+export interface AdminStats {
+  total_events: number;
+  total_users: number;
+  total_orders: number;
+  confirmed_orders: number;
+  total_revenue: number;
+  total_seats: number;
+  booked_seats: number;
+  seat_utilization: number;
+}
+
+export interface AdminOrderItem {
+  order_item_id: string;
+  seat_label: string;
+}
+
+export interface AdminOrder {
+  order_id: string;
+  user_id: string;
+  user_email: string;
+  session_id: string;
+  event_title: string;
+  status: string;
+  total_tickets: number;
+  total_amount: number;
+  currency: string;
+  created_at: string;
+  items: AdminOrderItem[];
+}
+
+export interface AdminOrderListResponse {
+  total: number;
+  orders: AdminOrder[];
+}

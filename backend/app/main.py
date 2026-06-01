@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
 from app.models import *  # noqa: F401, F403
-from app.routers import auth, event, queue, orders
+from app.routers import auth, event, queue, orders, admin
 
 
 from app.core.redis import close_redis
@@ -65,6 +65,7 @@ app.include_router(event.router)
 app.include_router(orders.router)
 
 app.include_router(queue.router)
+app.include_router(admin.router)
 
 
 

@@ -289,6 +289,7 @@ async def list_events(
     db: AsyncSession = Depends(get_db_session),
     category: str | None = Query(None, description="Filter by category"),
     city: str | None = Query(None, description="Filter by venue city"),
+    search: str | None = Query(None, description="Search by event title"),
     skip: int = Query(0, ge=0, description="Pagination offset"),
     limit: int = Query(20, ge=1, le=100, description="Results per page"),
 ):
@@ -305,6 +306,8 @@ async def list_events(
         query = query.where(Event.category.ilike(f"%{category}%"))
     if city:
         query = query.where(Event.venue_city.ilike(f"%{city}%"))
+    if search:
+        query = query.where(Event.title.ilike(f"%{search}%"))
 
     # ── Get total count ───────────────────────────────────────────────────────
     count_result = await db.execute(

@@ -15,6 +15,7 @@ from app.models.order import Order
 from app.models.order_item import OrderItem
 from app.models.session_seat import SessionSeat
 from app.models.seat import Seat
+from app.models.event_session import EventSession
 from app.models.user import User
 from app.schemas.order import CreateOrderRequest, CreateOrderResponse, OrderResponse
 from app.schemas.orders_history import MyOrdersResponse, OrderHistoryResponse, OrderHistoryItemResponse
@@ -294,4 +295,64 @@ async def create_order(
             failure_reason=order.failure_reason,
             created_at=order.created_at,
         )
+    )
+
+# Cancel order endpoint
+
+@router.post(
+    "/{order_id}/cancel",
+    response_model=OrderResponse,
+    summary="Cancel a confirmed order and release seats",
+)
+async def cancel_order(
+    order_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    result = await db.execute(
+        select(Order).where(
+            Order.order_id == order_id,
+            Order.user_id == current_user.user_id,
+        )
+    )
+    order = result.scalar_one_or_none()
+    if not order:
+        raise HTTPException(status_code=404, detail="Order not found")
+    if order.status not in (OrderStatus.CONFIRMED, OrderStatus.PENDING):
+        raise HTTPException(status_code=400, detail=f"Cannot cancel order with status {order.status.value}")
+
+    try:
+        seats_result = await db.execute(
+            select(SessionSeat).where(SessionSeat.order_id == order_id)
+        )
+        session_seats = seats_result.scalars().all()
+        for ss in session_seats:
+            ss.status = SessionSeatStatus.AVAILABLE
+            ss.booked_by = None
+            ss.booked_at = None
+            ss.order_id = None
+
+        if session_seats:
+            session_ids = list({ss.session_id for ss in session_seats})
+            for sid in session_ids:
+                count = sum(1 for ss in session_seats if ss.session_id == sid)
+                sess_result = await db.execute(
+                    select(EventSession).where(EventSession.session_id == sid)
+                )
+                session = sess_result.scalar_one_or_none()
+                if session:
+                    session.available_seats += count
+
+        order.status = OrderStatus.CANCELLED
+        await db.commit()
+
+    except Exception:
+        await db.rollback()
+        raise HTTPException(status_code=500, detail="Failed to cancel order")
+
+    return OrderResponse(
+        order_id=order.order_id,
+        status=order.status.value,
+        failure_reason=order.failure_reason,
+        created_at=order.created_at,
     )

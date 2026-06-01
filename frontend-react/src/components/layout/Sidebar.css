@@ -32,6 +32,21 @@
   font-size: 1.1rem;
 }
 
+.sidebar-divider {
+  height: 1px;
+  background: #334155;
+  margin: 12px 20px;
+}
+
+.sidebar-section-label {
+  padding: 8px 25px 4px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 1.5px;
+  color: #64748b;
+  font-weight: 600;
+}
+
 @media (max-width: 768px) {
   .sidebar {
     position: fixed;
