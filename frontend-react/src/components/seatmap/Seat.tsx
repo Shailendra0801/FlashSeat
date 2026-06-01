@@ -1,7 +1,7 @@
 import type { SeatMapItem } from '../../types';
 import { useCartStore } from '../../stores/cartStore';
 import { getSeatClassName, getSeatLabel } from '../../utils/seatUtils';
-import { SECTION_LABELS } from '../../utils/constants';
+import { SECTION_LABELS, SECTION_PRICES, formatPrice } from '../../utils/constants';
 
 interface SeatProps {
   seat: SeatMapItem;
@@ -18,7 +18,8 @@ export function Seat({ seat, onLock }: SeatProps) {
 
   const statusLabel = isLockedByMe ? 'Selected' : seat.status;
   const sectionLabel = SECTION_LABELS[seat.section] || seat.section;
-  const tooltipText = `${label} (${sectionLabel}) — ${statusLabel}`;
+  const price = SECTION_PRICES[seat.section] || 0;
+  const tooltipText = `${label} (${sectionLabel}) — ${statusLabel} — ${formatPrice(price)}`;
 
   return (
     <div

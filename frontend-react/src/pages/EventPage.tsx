@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { useSeatPolling } from '../hooks/useSeatPolling';
+import { useSeatUpdates } from '../hooks/useSeatUpdates';
 import { useQueuePolling } from '../hooks/useQueuePolling';
 import { useCartStore } from '../stores/cartStore';
 import { apiRequest, ApiError } from '../api/client';
@@ -71,7 +71,7 @@ export function EventPage() {
     setSeats(loadedSeats);
   }, []);
 
-  const { refetch } = useSeatPolling(
+  const { refetch } = useSeatUpdates(
     isValidEventId ? eventId : undefined,
     sessionId,
     user?.user_id,

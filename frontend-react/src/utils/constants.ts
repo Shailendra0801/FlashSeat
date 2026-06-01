@@ -15,3 +15,17 @@ export const SECTION_LABELS: Record<SeatSection, string> = {
   regular: 'Regular',
   standing: 'Standing',
 };
+
+// Placeholder prices (INR) — will be replaced by backend pricing when available
+export const SECTION_PRICES: Record<SeatSection, number> = {
+  vip: 5000,
+  premium: 3000,
+  regular: 1500,
+  standing: 800,
+};
+
+export const CURRENCY = 'INR';
+
+export function formatPrice(amount: number): string {
+  return `₹${amount.toLocaleString('en-IN')}`;
+}

@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { apiRequest } from '../api/client';
+import { apiRequest, ApiError } from '../api/client';
 import type { CreateOrderResponse, SeatMapItem } from '../types';
 
 interface CartState {
@@ -13,6 +13,7 @@ interface CartState {
 
   addSeat: (seatId: string) => void;
   removeSeat: (seatId: string) => void;
+  removeSeatWithUnlock: (seatId: string) => Promise<void>;
   setSession: (sessionId: string) => void;
   clearCart: () => void;
   reconcile: (seats: SeatMapItem[], currentUserId: string) => void;
@@ -29,7 +30,6 @@ const cartStorage = {
     if (!str) return null;
     try {
       const parsed = JSON.parse(str);
-      // Restore seatIds from array back to Set
       if (parsed?.state?.seatIds && Array.isArray(parsed.state.seatIds)) {
         parsed.state.seatIds = new Set(parsed.state.seatIds);
       }
@@ -40,13 +40,11 @@ const cartStorage = {
   },
   setItem: (name: string, value: unknown) => {
     const state = value as { state: CartState };
-    // Convert Set to array for JSON serialization
     const serializable = {
       ...state,
       state: {
         ...state.state,
         seatIds: Array.from(state.state.seatIds),
-        // Don't persist transient state
         checkoutInProgress: false,
         checkoutSuccess: false,
         lastOrder: null,
@@ -80,6 +78,31 @@ export const useCartStore = create<CartState>()(
         const next = new Set(get().seatIds);
         next.delete(seatId);
         set({ seatIds: next });
+      },
+
+      // Attempts to call the unlock endpoint before removing from cart.
+      // If the endpoint doesn't exist yet (404), falls back to UI-only removal.
+      removeSeatWithUnlock: async (seatId) => {
+        const { sessionId } = get();
+        // Remove from local state immediately for responsive UI
+        const next = new Set(get().seatIds);
+        next.delete(seatId);
+        set({ seatIds: next });
+
+        // Try to unlock on the backend
+        if (sessionId) {
+          try {
+            await apiRequest(`/events/seats/${seatId}/unlock?session_id=${sessionId}`, {
+              method: 'POST',
+            });
+          } catch (err) {
+            // 404 = endpoint doesn't exist yet, that's fine — lock expires via TTL
+            // 409 = already released, also fine
+            if (err instanceof ApiError && err.status !== 404 && err.status !== 409) {
+              console.warn('Unlock failed:', err.message);
+            }
+          }
+        }
       },
 
       setSession: (sessionId) => {
@@ -146,7 +169,6 @@ export const useCartStore = create<CartState>()(
     {
       name: 'flashseat-cart',
       storage: cartStorage as any,
-      // Only persist these fields
       partialize: (state) => ({
         seatIds: state.seatIds,
         sessionId: state.sessionId,
