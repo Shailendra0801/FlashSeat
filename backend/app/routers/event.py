@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.dependencies import get_current_user, is_admin
 from app.core.redis import get_redis, seat_lock_key
-from app.database import get_db_session
+from app.database import AsyncSessionFactory, get_db_session
 from app.models.enums import SessionSeatStatus, SessionStatus
 from app.models.event import Event
 from app.models.event_session import EventSession
@@ -486,18 +486,23 @@ async def lock_seat(
         )
 
     async def _mark_reserved():
-        # Background task: mark the SessionSeat as RESERVED if still present.
-        async with db.begin_nested():
-            q = select(SessionSeat).where(
-                SessionSeat.session_id == session_id,
-                SessionSeat.seat_id == seat_id,
-            )
-            res = await db.execute(q)
-            session_seat = res.scalar_one_or_none()
-            if session_seat is None:
-                return
-            session_seat.status = SessionSeatStatus.RESERVED
-            session_seat.booked_by = current_user.user_id
+        # Must use its own session because the request-scoped session is
+        # committed/closed before background tasks run.
+        async with AsyncSessionFactory() as bg_db:
+            try:
+                async with bg_db.begin():
+                    q = select(SessionSeat).where(
+                        SessionSeat.session_id == session_id,
+                        SessionSeat.seat_id == seat_id,
+                    )
+                    res = await bg_db.execute(q)
+                    session_seat = res.scalar_one_or_none()
+                    if session_seat is None:
+                        return
+                    session_seat.status = SessionSeatStatus.RESERVED
+                    session_seat.booked_by = current_user.user_id
+            except Exception:
+                pass  # Seat lock TTL will handle cleanup if this fails
 
     background_tasks.add_task(_mark_reserved)
 

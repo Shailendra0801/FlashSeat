@@ -43,6 +43,6 @@ export async function apiRequest<T>(
   try {
     return await response.json();
   } catch {
-    return null as T;
+    throw new ApiError('Invalid JSON response from server', response.status);
   }
 }

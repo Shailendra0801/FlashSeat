@@ -13,6 +13,7 @@ Safety:
 import asyncio
 import logging
 import re
+import uuid
 from typing import AsyncIterator
 
 import redis.asyncio as aioredis
@@ -48,11 +49,23 @@ async def _iter_redis_keys_by_scan(
 
 
 async def _release_seat_if_needed(db, session_id: str, seat_id: str) -> int:
+    """Release a RESERVED seat back to AVAILABLE.
+
+    Converts Redis key strings to UUID objects for direct comparison
+    against the UUID columns, avoiding CAST on every row which hurts
+    performance and bypasses indexes.
+    """
+    try:
+        session_uuid = uuid.UUID(session_id)
+        seat_uuid = uuid.UUID(seat_id)
+    except ValueError:
+        return 0
+
     q = (
         update(SessionSeat)
         .where(
-            SessionSeat.session_id.cast(str) == session_id,
-            SessionSeat.seat_id.cast(str) == seat_id,
+            SessionSeat.session_id == session_uuid,
+            SessionSeat.seat_id == seat_uuid,
             SessionSeat.status == SessionSeatStatus.RESERVED,
         )
         .values(
@@ -61,9 +74,11 @@ async def _release_seat_if_needed(db, session_id: str, seat_id: str) -> int:
             booked_at=None,
             order_id=None,
         )
+        .execution_options(synchronize_session=False)
     )
     res = await db.execute(q)
-    return int(getattr(res, "rowcount", 0) or 0)
+    await db.flush()
+    return res.rowcount
 
 
 async def cleanup_abandoned_seat_locks_once() -> None:
@@ -130,4 +145,3 @@ async def cleanup_abandoned_seat_locks_loop(interval_seconds: int = 60) -> None:
             logger.exception("seat-lock cleanup run failed")
 
         await asyncio.sleep(interval_seconds)
-

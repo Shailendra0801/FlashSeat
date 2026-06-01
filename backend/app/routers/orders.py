@@ -341,7 +341,10 @@ async def cancel_order(
                 )
                 session = sess_result.scalar_one_or_none()
                 if session:
-                    session.available_seats += count
+                    session.available_seats = min(
+                        session.available_seats + count,
+                        session.total_seats,
+                    )
 
         order.status = OrderStatus.CANCELLED
         await db.commit()

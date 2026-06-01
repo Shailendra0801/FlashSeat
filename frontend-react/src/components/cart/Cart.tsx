@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useCartStore } from '../../stores/cartStore';
 import { CartItem } from './CartItem';
 import { CartSummary } from './CartSummary';
@@ -15,7 +15,10 @@ export function Cart({ seatMap }: CartProps) {
   const { seatIds, checkoutInProgress, errorMessage } = useCartStore();
   const [confirmOpen, setConfirmOpen] = useState(false);
 
-  const seatLabelMap = new Map(seatMap.map((s) => [s.seat_id, getSeatLabel(s)]));
+  const seatLabelMap = useMemo(
+    () => new Map(seatMap.map((s) => [s.seat_id, getSeatLabel(s)])),
+    [seatMap]
+  );
 
   return (
     <>

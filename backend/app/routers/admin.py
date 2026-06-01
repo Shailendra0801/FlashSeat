@@ -62,11 +62,6 @@ async def admin_stats(
 # PUT /admin/events/{event_id} — Edit event details
 # ─────────────────────────────────────────────────────────────────────────────
 
-class EventUpdateRequest(  # noqa: E501
-    __doc__ = "Update event details (not seats or sessions)"
-):
-    pass
-
 from pydantic import BaseModel, Field
 from typing import Optional
 

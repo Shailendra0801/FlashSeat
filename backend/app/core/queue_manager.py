@@ -3,18 +3,20 @@ Queue Manager — handles active users and waiting room logic for high-demand ev
 
 Improvements:
 - Atomic check + reserve using Lua script (prevents race conditions)
-- Efficient queue position calculation
+- Efficient queue position calculation using LPOS
 - Consistent use of injected Redis client
 - Better logging and error handling
 """
 
 import asyncio
 import logging
+import re
 
 import redis.asyncio as aioredis
 
 from app.core.redis import (
     active_users_key,
+    get_redis_client,
     user_session_key,
     waiting_room_key,
 )
@@ -25,6 +27,9 @@ logger = logging.getLogger(__name__)
 USER_SESSION_TTL = 1800   # 30 minutes
 QUEUE_TTL = 3600          # 1 hour
 MAX_ACTIVE_USERS = 500    # TODO: Move to settings later
+
+# Regex to extract (event_id, user_id) from user_session:{event_id}:{user_id}
+_USER_SESSION_RE = re.compile(r"^user_session:([^:]+):(.+)$")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -170,35 +175,79 @@ async def _get_queue_position(
     user_id: str,
     redis: aioredis.Redis,
 ) -> int:
-    """Get 1-based position in queue."""
-    all_users = await redis.lrange(queue_key, 0, -1)
+    """Get 1-based position in queue.
+
+    Uses LPOS (Redis 6.0.6+) which is O(n) worst-case but stops at the
+    first match, making it much faster than fetching the entire list.
+    Falls back to full LRANGE if LPOS is unavailable.
+    """
     try:
-        return all_users.index(user_id) + 1
-    except ValueError:
-        return 0
+        pos = await redis.lpos(queue_key, user_id)
+        return (pos + 1) if pos is not None else 0
+    except AttributeError:
+        # Redis client without LPOS support — fall back to full scan
+        all_users = await redis.lrange(queue_key, 0, -1)
+        try:
+            return all_users.index(user_id) + 1
+        except ValueError:
+            return 0
 
 
 async def listen_for_expired_sessions(interval_seconds: int = 5) -> None:
-    """Best-effort cleanup for dirty disconnects.
+    """Clean up slots for users whose session keys have expired (dirty disconnects).
 
-    Current implementation is intentionally conservative:
-    - It scans user_session:* keys and if a per-user key no longer exists,
-      it may allow slots to be reclaimed.
-
-    If you later switch to Redis keyspace notifications, this function can be
-    updated to react instantly.
+    Scans user_session:* keys. For each key that no longer exists in Redis
+    (expired via TTL), removes the user from active_users and promotes the
+    next user from the waiting room.
     """
-    # NOTE: we don't have a mapping from user_session keys back to event_ids
-    # except by parsing the key format: user_session:{event_id}:{user_id}
-    # This is a placeholder to keep the app runnable.
+    USER_SESSION_PATTERN = "user_session:*"
+
     while True:
         try:
-            # No-op placeholder: slot reclamation can be done by user-triggered
-            # leave/refresh endpoints and Redis TTL expiry.
+            redis = await get_redis_client()
+
+            # Collect all user_session keys currently alive
+            alive_keys: list[str] = []
+            cursor: str | int = 0
+            while True:
+                cursor, keys = await redis.scan(
+                    cursor=cursor, match=USER_SESSION_PATTERN, count=500
+                )
+                alive_keys.extend(keys)
+                if str(cursor) == "0":
+                    break
+
+            # For each alive key, verify it still exists (may have expired
+            # between SCAN and now — acceptable race, we'll catch it next pass).
+            # The real cleanup happens for keys that are *missing* from this scan
+            # but whose users may still be in active_users sets.
+            # We handle this by checking each active_users member's session key.
+            seen_events: set[str] = set()
+            for key in alive_keys:
+                m = _USER_SESSION_RE.match(key)
+                if not m:
+                    continue
+                seen_events.add(m.group(1))
+
+            # For each known event, check active members for stale sessions
+            for event_id in seen_events:
+                a_key = active_users_key(event_id)
+                members = await redis.smembers(a_key)
+                for user_id in members:
+                    s_key = user_session_key(event_id, user_id)
+                    if not await redis.exists(s_key):
+                        # Session expired — remove from active set
+                        await redis.srem(a_key, user_id)
+                        promoted = await _promote_next_from_queue(event_id, redis)
+                        logger.info(
+                            "Expired session cleanup: removed user %s from event %s, promoted=%s",
+                            user_id, event_id, promoted,
+                        )
+
             await asyncio.sleep(interval_seconds)
+
         except asyncio.CancelledError:
             raise
         except Exception:
             logger.exception("listen_for_expired_sessions loop failed")
             await asyncio.sleep(interval_seconds)
-

@@ -41,9 +41,8 @@ It uses a two-layer locking strategy — Redis distributed locks for fast soft r
 | Database | PostgreSQL + SQLAlchemy 2.0 (async) |
 | Cache / Locks | Redis (redis.asyncio) |
 | Auth | JWT (python-jose) |
-| Frontend | HTML, CSS, Vanilla JS |
+| Frontend | React 18 + TypeScript + Vite |
 | Password Hashing | bcrypt (pwdlib) |
-<!-- | Migrations | Alembic | -->
 
 ---
 
@@ -74,15 +73,21 @@ FlashSeat/
 │       │   └── orders.py             # Checkout and order history
 │       ├── scripts/                   # Admin utilities and load testing
 │       └── main.py                    # App entrypoint, lifespan
-├── frontend/
-│   ├── index.html                     # Login / Register page
-│   ├── pages/
-│   │   ├── dashboard.html
-│   │   └── event.html                 # Seat selection + booking
-│   ├── js/
-│   │   ├── auth.js
-│   │   └── event.js
-│   └── css/
+├── frontend-react/
+│   ├── index.html                     # Vite entry point
+│   ├── src/
+│   │   ├── App.tsx                      # Router + layout
+│   │   ├── main.tsx                     # React entry
+│   │   ├── api/                         # API client (fetch wrapper)
+│   │   ├── components/                  # Cart, SeatMap, etc.
+│   │   ├── hooks/                       # Custom React hooks
+│   │   ├── pages/                       # Dashboard, Event, Auth
+│   │   ├── stores/                      # Zustand state management
+│   │   ├── types/                       # TypeScript interfaces
+│   │   └── utils/                       # Constants, formatters
+│   ├── package.json
+│   ├── tsconfig.json
+│   └── vite.config.ts
 ├── .env
 ├── requirements.txt
 └── README.md
@@ -161,12 +166,10 @@ To generate a secret key:
 python -c "import secrets; print(secrets.token_hex(32))"
 ```
 
-### 7. Run database migrations
+### 7. Database setup
 
-```bash
-cd backend
-# alembic upgrade head
-```
+Tables are created automatically on first startup via SQLAlchemy's `create_all`.  
+No migration tool is required for development.
 
 ### 8. Start the backend server
 
@@ -176,16 +179,15 @@ uvicorn app.main:app --reload
 
 Server runs at: `http://127.0.0.1:8000`
 
-### 9. Open the frontend
-
-Open `frontend/index.html` directly in your browser, or serve it with:
+### 9. Start the frontend
 
 ```bash
-cd frontend
-python -m http.server 5500
+cd frontend-react
+npm install
+npm run dev
 ```
 
-Then visit: `http://localhost:5500`
+Then visit the URL shown by Vite (typically `http://localhost:5173`)
 
 ### 10. API Docs
 
