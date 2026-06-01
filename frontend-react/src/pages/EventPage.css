@@ -1,0 +1,109 @@
+.event-page {
+  max-width: 1200px;
+}
+
+.event-page-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+  color: #64748b;
+}
+
+.event-page-error {
+  text-align: center;
+  padding: 60px 20px;
+}
+
+.event-page-error button {
+  margin-top: 16px;
+  padding: 12px 24px;
+  background: #667eea;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.btn-back {
+  background: none;
+  border: none;
+  color: #667eea;
+  font-weight: 600;
+  font-size: 1rem;
+  cursor: pointer;
+  margin-bottom: 20px;
+  padding: 8px 0;
+  transition: color 0.2s;
+}
+
+.btn-back:hover {
+  color: #4f46e5;
+}
+
+.event-title {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #1e293b;
+  margin-bottom: 8px;
+}
+
+.event-details {
+  color: #64748b;
+  font-size: 1rem;
+  margin-bottom: 24px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.event-separator {
+  color: #cbd5e1;
+}
+
+.session-info {
+  color: #475569;
+  font-weight: 500;
+  margin-bottom: 16px;
+}
+
+.event-layout {
+  display: grid;
+  grid-template-columns: 1fr 340px;
+  gap: 24px;
+  align-items: start;
+}
+
+.seat-map-section {
+  min-width: 0;
+}
+
+.seat-map-section h2 {
+  font-size: 1.3rem;
+  color: #1e293b;
+  margin-bottom: 12px;
+}
+
+.cart-section {
+  position: sticky;
+  top: 32px;
+}
+
+@media (max-width: 1024px) {
+  .event-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .cart-section {
+    position: static;
+  }
+}
+
+@media (max-width: 768px) {
+  .event-title {
+    font-size: 1.5rem;
+  }
+}

@@ -1,0 +1,76 @@
+.waiting-room {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  color: white;
+  text-align: center;
+}
+
+.waiting-content {
+  max-width: 480px;
+  padding: 40px;
+}
+
+.waiting-content h2 {
+  font-size: 1.8rem;
+  margin-bottom: 12px;
+}
+
+.waiting-subtitle {
+  opacity: 0.7;
+  margin-bottom: 30px;
+}
+
+.queue-position h1 {
+  font-size: 5rem;
+  margin: 10px 0;
+  color: #60a5fa;
+  font-weight: 800;
+}
+
+.queue-position p {
+  font-size: 1.1rem;
+  opacity: 0.7;
+}
+
+.estimated-wait {
+  margin: 20px 0;
+  font-size: 1rem;
+  opacity: 0.8;
+}
+
+.waiting-loader {
+  border: 5px solid #334155;
+  border-top: 5px solid #60a5fa;
+  border-radius: 50%;
+  width: 50px;
+  height: 50px;
+  animation: spin 1s linear infinite;
+  margin: 24px auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn-leave-queue {
+  margin-top: 20px;
+  padding: 12px 28px;
+  background: #374151;
+  color: white;
+  border: 1px solid #4b5563;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-leave-queue:hover {
+  background: #4b5563;
+}

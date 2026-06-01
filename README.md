@@ -22,7 +22,7 @@ It uses a two-layer locking strategy — Redis distributed locks for fast soft r
 ## 🚀 Features
 
 - JWT-based authentication with admin/user roles
-- Admin can create events, sessions, and seat layouts
+- Admin can create events, sessions, and seat layouts dynamically
 - Waiting room queue to limit concurrent users on the booking page
 - Redis distributed locks for per-seat soft reservation (300s TTL)
 - PostgreSQL `SELECT ... FOR UPDATE NOWAIT` for race-safe final booking
@@ -42,7 +42,7 @@ It uses a two-layer locking strategy — Redis distributed locks for fast soft r
 | Cache / Locks | Redis (redis.asyncio) |
 | Auth | JWT (python-jose) |
 | Frontend | HTML, CSS, Vanilla JS |
-| Password Hashing | bcrypt (passlib) |
+| Password Hashing | bcrypt (pwdlib) |
 <!-- | Migrations | Alembic | -->
 
 ---
@@ -87,6 +87,256 @@ FlashSeat/
 ├── requirements.txt
 └── README.md
 ```
+
+---
+
+## ⚙️ Setup & Installation
+
+### Prerequisites
+
+- Python 3.11+
+- PostgreSQL 15+
+- Redis 7+
+- Git
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/Shailendra0801/FlashSeat.git
+cd FlashSeat
+```
+
+### 2. Create and activate virtual environment
+
+```bash
+python -m venv venv
+
+# Windows
+venv\Scripts\activate
+
+# Mac/Linux
+source venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### 4. Set up PostgreSQL
+
+Open pgAdmin or psql and create the database:
+
+```sql
+CREATE DATABASE flashseat;
+```
+
+### 5. Set up Redis
+
+Make sure Redis is running locally on default port `6379`.
+
+```bash
+# Windows (WSL or Redis installer)
+redis-server
+
+# Mac
+brew services start redis
+```
+
+### 6. Configure environment variables
+
+Create a `.env` file inside the `backend/` folder:
+
+```env
+DATABASE_URL=postgresql+asyncpg://postgres:yourpassword@localhost:5432/flashseat
+SECRET_KEY=your_generated_secret_key
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+REDIS_URL=redis://localhost:6379
+```
+
+To generate a secret key:
+```bash
+python -c "import secrets; print(secrets.token_hex(32))"
+```
+
+### 7. Run database migrations
+
+```bash
+cd backend
+# alembic upgrade head
+```
+
+### 8. Start the backend server
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Server runs at: `http://127.0.0.1:8000`
+
+### 9. Open the frontend
+
+Open `frontend/index.html` directly in your browser, or serve it with:
+
+```bash
+cd frontend
+python -m http.server 5500
+```
+
+Then visit: `http://localhost:5500`
+
+### 10. API Docs
+
+Once the server is running:
+- Swagger UI: `http://127.0.0.1:8000/docs`
+- ReDoc: `http://127.0.0.1:8000/redoc`
+
+---
+
+## 🏗 Architecture Overview
+
+FlashSeat uses a **three-layer concurrency strategy** to safely handle flash-sale bookings:
+
+1. **Redis soft locks** — per-seat hold with short TTL before opening a DB transaction
+2. **PostgreSQL row locks** — final booking using `SELECT ... FOR UPDATE NOWAIT`
+3. **DB-level uniqueness constraints** — guarantee a session seat cannot be double-booked even if upstream logic fails
+
+A **queue/waiting room** limits how many users can actively load the booking UI for an event.
+
+### 🔒 Concurrency Strategy
+
+```mermaid
+flowchart LR
+    A[Concurrent booking requests] --> B[Layer 1: Redis NX Lock\nFast rejection\nTTL = 300s]
+    B --> C{Lock acquired?}
+    C -- No --> D[409 Instant rejection\nNo DB hit]
+    C -- Yes --> E[Layer 2: PostgreSQL\nSELECT FOR UPDATE NOWAIT\nREPEATABLE READ]
+    E --> F{Row locked\nby another txn?}
+    F -- Yes --> G[OperationalError\n409 Try again]
+    F -- No --> H[Final DB constraints:\nuq_session_seat\nuq_order_item_session_seat]
+    H --> I[COMMIT]
+```
+
+| Layer | Mechanism | Purpose |
+|---|---|---|
+| Redis `SET NX` | Distributed lock | Fast rejection, prevents thundering herd on DB |
+| `SELECT FOR UPDATE NOWAIT` | Row-level DB lock | Prevents race within same transaction |
+| `uq_session_seat` | `(session_id, seat_id)` unique | DB-level: one seat per session, ever |
+| `uq_order_item_session_seat` | `(session_seat_id)` unique | DB-level: one order item per seat, ever |
+
+> Even if Redis goes down, PostgreSQL constraints guarantee correctness. Redis is a performance optimization, not a correctness requirement.
+
+---
+
+## 🌐 API Reference
+
+### Health / Root
+
+#### `GET /`
+Returns `message`, `docs` and `redoc` paths.
+
+#### `GET /health`
+```json
+{ "status": "healthy" }
+```
+
+---
+
+### Auth
+Prefix: `/auth`
+
+#### `POST /auth/register`
+- **Auth:** none
+- **Body:** `full_name`, `email`, `password`
+- Verifies email not already registered, hashes password, creates `User(is_admin=false, is_active=true)`
+
+#### `POST /auth/login`
+- **Auth:** none
+- **Body:** `email`, `password`
+- Returns `{ "access_token": "...", "token_type": "bearer" }`
+- JWT payload: `{ "sub": user.email, "exp": ... }`
+
+#### `GET /auth/me`
+- **Auth:** Bearer JWT
+- Returns current user profile.
+
+#### `GET /auth/users`
+- **Auth:** Bearer JWT (admin only)
+- Returns all users.
+
+---
+
+### Events
+Prefix: `/events`
+
+#### `POST /events/`
+- **Auth:** admin only
+- Creates an `Event`, `Seat` rows from `seat_layout`, `EventSession` rows, and `SessionSeat` rows (all `AVAILABLE`) for every seat per session.
+
+#### `POST /events/{event_id}/generate-seats`
+- **Auth:** admin only
+- Adds more seats to an existing event and creates corresponding `SessionSeat` rows for all existing sessions.
+
+#### `GET /events/`
+- **Auth:** none
+- **Query params:** `category`, `city`, `skip` (default `0`), `limit` (default `20`, max `100`)
+- Returns paginated events with `total_sessions` per event.
+
+#### `GET /events/{event_id}`
+- **Auth:** none
+- Returns full event details including all sessions.
+
+#### `GET /events/{event_id}/seats`
+- **Auth:** none
+- **Query param:** `session_id` (required)
+- Returns seat map for session including `total_seats`, `available_seats`, `booked_seats`, `blocked_seats` and per-seat `status`, `booked_by`, `booked_at`.
+
+#### `POST /events/seats/{seat_id}/lock`
+- **Auth:** Bearer JWT
+- **Query param:** `session_id` (required)
+- Acquires Redis lock: `SET seat:{session_id}:{seat_id} {user_id} NX EX 300`
+- On success schedules background DB update: `SessionSeat.status = RESERVED`
+- Returns `409` if seat already locked.
+
+---
+
+### Orders
+Prefix: `/orders`
+
+#### `GET /orders/me`
+- **Auth:** Bearer JWT
+- Returns order history with `seat_label` snapshot per item.
+
+#### `POST /orders`
+- **Auth:** Bearer JWT
+- **Body:** `session_id`, `seat_ids: uuid[]`
+- Full booking finalization flow:
+  1. Validates Redis lock ownership for every seat
+  2. Opens PostgreSQL transaction:
+     - Creates `Order(PENDING)`
+     - `SELECT SessionSeat FOR UPDATE NOWAIT`
+     - Verifies each seat is `RESERVED` and `booked_by == current_user`
+     - Updates seats to `BOOKED`, binds `order_id`
+     - Creates `OrderItem` per seat with `seat_label` snapshot
+     - Sets `Order(CONFIRMED)`, commits
+  3. Deletes Redis lock keys via pipeline
+- **Errors:** `409` on lock failure, contention, or integrity violation; `500` on unexpected error.
+
+---
+
+### Queue (Waiting Room)
+Prefix: `/events`
+
+#### `GET /events/{event_id}/queue`
+- **Auth:** Bearer JWT
+- If active users < `MAX_ACTIVE_USERS`: returns `status: access_granted`
+- Else: returns `status: in_queue` with `queue_position` and `estimated_wait_seconds`
+
+#### `POST /events/{event_id}/leave`
+- **Auth:** Bearer JWT
+- Removes user from `active_users:{event_id}`, deletes `user_session` key, promotes next user from `waiting_room`.
 
 ---
 
@@ -142,6 +392,7 @@ erDiagram
         UUID session_id FK
         int total_tickets
         decimal total_amount
+        string currency
         enum status
     }
     order_items {
@@ -162,6 +413,37 @@ erDiagram
     orders ||--o{ order_items : "contains"
     session_seats ||--o| order_items : "referenced by"
 ```
+
+### Key Constraints
+
+| Table | Constraint | Purpose |
+|---|---|---|
+| `session_seats` | `uq_session_seat_per_session (session_id, seat_id)` | Prevents same seat inserted twice for same session |
+| `order_items` | `uq_order_item_session_seat (session_seat_id)` | Ensures a seat can only belong to one order globally |
+| `seats` | `uq_seat_event_row_number (event_id, row_name, seat_number)` | No duplicate physical seats per event |
+| `event_sessions` | `available_seats >= 0`, `<= total_seats`, `total_seats > 0` | Prevents counter corruption |
+
+---
+
+## 🔴 Redis Usage
+
+Redis client created in `backend/app/core/redis.py` using `redis.asyncio`.
+
+### Key Patterns
+
+| Key | Type | Purpose |
+|---|---|---|
+| `active_users:{event_id}` | Set | Currently active booking-page users |
+| `waiting_room:{event_id}` | List (FIFO) | Queue of waiting user ids |
+| `user_session:{event_id}:{user_id}` | TTL string | Dirty disconnect detection |
+| `seat:{session_id}:{seat_id}` | String | Distributed seat lock; value = `user_id` |
+
+### Where It's Used
+
+- `queue_manager.py` — Lua script `ATOMIC_ENTER_SCRIPT` for atomic grant vs enqueue; promotes users on leave
+- `event.py` — `POST /events/seats/{seat_id}/lock` uses `SET NX EX 300`
+- `orders.py` — validates lock ownership with `GET`; deletes locks after commit via pipeline
+- `seat_lock_cleanup.py` — scans `seat:*` keys; releases seats back to `AVAILABLE` when TTL is low/expired
 
 ---
 
@@ -213,7 +495,7 @@ flowchart TD
     S --> T[Create Order status=PENDING]
     T --> U[SELECT session_seats FOR UPDATE NOWAIT]
     U --> V{All seats RESERVED\nand booked_by == user?}
-    V -- No --> W[ROLLBACK → 409 Conflict]
+    V -- No --> W[ROLLBACK - 409 Conflict]
     V -- Yes --> X[Update each seat to BOOKED\nCreate OrderItems\nSet Order status=CONFIRMED\nCOMMIT]
     X --> Y[Delete Redis lock keys\nvia pipeline]
     Y --> Z[Return order confirmation]
@@ -223,184 +505,25 @@ flowchart TD
 
 ---
 
-## 🔒 Concurrency Strategy
+## ⚙️ Background Tasks
 
-FlashSeat uses a **two-layer defense** to prevent double booking:
+Started in `backend/app/main.py` lifespan on startup:
 
-```mermaid
-flowchart LR
-    A[Concurrent booking requests] --> B[Layer 1: Redis NX Lock\nFast rejection\nTTL = 300s]
-    B --> C{Lock acquired?}
-    C -- No --> D[409 Instant rejection\nNo DB hit]
-    C -- Yes --> E[Layer 2: PostgreSQL\nSELECT FOR UPDATE NOWAIT\nREPEATABLE READ]
-    E --> F{Row locked\nby another txn?}
-    F -- Yes --> G[OperationalError\n409 Try again]
-    F -- No --> H[Final DB constraints:\nuq_session_seat\nuq_order_item_session_seat]
-    H --> I[COMMIT]
-```
+**1. Queue / disconnect handling**
+- `listen_for_expired_sessions()` — handles dirty disconnects based on TTL expiry (currently conservative placeholder loop).
 
-| Layer | Mechanism | Purpose |
-|---|---|---|
-| Redis `SET NX` | Distributed lock | Fast rejection, prevents thundering herd on DB |
-| `SELECT FOR UPDATE NOWAIT` | Row-level DB lock | Prevents race within same transaction |
-| `uq_session_seat` constraint | `(session_id, seat_id)` unique | DB-level: one seat per session, ever |
-| `uq_order_item_session_seat` | `(session_seat_id)` unique | DB-level: one order item per seat, ever |
-
-> Even if Redis goes down, the PostgreSQL constraints guarantee correctness. Redis is a performance optimization, not a correctness requirement.
-
----
-
-## 🌐 API Reference
-
-### Auth
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| POST | `/auth/register` | None | Register new user |
-| POST | `/auth/login` | None | Login, returns JWT |
-| GET | `/auth/me` | JWT | Get current user profile |
-| GET | `/auth/users` | JWT + Admin | List all users |
-
-### Events
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| POST | `/events/` | JWT + Admin | Create event with sessions and seats |
-| POST | `/events/{event_id}/generate-seats` | JWT + Admin | Add more seats to existing event |
-| GET | `/events/` | None | List events (filter by category, city) |
-| GET | `/events/{event_id}` | None | Get event with sessions |
-| GET | `/events/{event_id}/seats` | None | Get seat map for a session |
-| POST | `/events/seats/{seat_id}/lock` | JWT | Soft-lock a seat via Redis |
-
-### Queue
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| GET | `/events/{event_id}/queue` | JWT | Enter waiting room or get access |
-| POST | `/events/{event_id}/leave` | JWT | Leave booking page, free slot |
-
-### Orders
-| Method | Route | Auth | Description |
-|---|---|---|---|
-| POST | `/orders` | JWT | Finalize booking (Redis → PostgreSQL) |
-| GET | `/orders/me` | JWT | Get current user's order history |
-
----
-
-## ⚙️ Setup & Installation
-
-### Prerequisites
-
-- Python 3.11+
-- PostgreSQL 15+
-- Redis 7+
-- Git
-
----
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/Shailendra0801/FlashSeat.git
-cd FlashSeat
-```
-
-### 2. Create and activate virtual environment
-
-```bash
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# Mac/Linux
-source venv/bin/activate
-```
-
-### 3. Install dependencies
-
-```bash
-pip install -r requirements.txt
-```
-
-### 4. Set up PostgreSQL
-
-Open pgAdmin or psql and create the database:
-
-```sql
-CREATE DATABASE flashseat;
-```
-
-### 5. Set up Redis
-
-Make sure Redis is running locally on default port `6379`.
-
-```bash
-# Windows (if using Redis via WSL or installer)
-redis-server
-
-# Mac
-brew services start redis
-```
-
-### 6. Configure environment variables
-
-Create a `.env` file inside the `backend/` folder:
-
-```env
-DATABASE_URL=postgresql+asyncpg://postgres:yourpassword@localhost:5432/flashseat
-SECRET_KEY=your_generated_secret_key
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=60
-REDIS_URL=redis://localhost:6379
-```
-
-To generate a secret key:
-```bash
-python -c "import secrets; print(secrets.token_hex(32))"
-```
-
-### 7. Run database migrations
-
-```bash
-cd backend
-alembic upgrade head
-```
-
-### 8. Start the backend server
-
-```bash
-cd backend
-uvicorn app.main:app --reload
-```
-
-Server runs at: `http://127.0.0.1:8000`
-
-### 9. Open the frontend
-
-Open `frontend/index.html` directly in your browser, or serve it with:
-
-```bash
-cd frontend
-python -m http.server 5500
-```
-
-Then visit: `http://localhost:5500`
-
----
-
-## 📖 API Docs
-
-Once the server is running:
-
-- Swagger UI: `http://127.0.0.1:8000/docs`
-- ReDoc: `http://127.0.0.1:8000/redoc`
+**2. Abandoned seat lock cleanup**
+- `cleanup_abandoned_seat_locks_loop(interval_seconds=60)`
+- Scans `seat:*` keys every 60s
+- Releases `SessionSeat` rows back to `AVAILABLE` when TTL is low or expired and seat is still `RESERVED`
 
 ---
 
 ## 🧪 Load Testing
 
-Admin scripts for concurrency testing are available in `backend/app/scripts/`:
+Admin scripts for concurrency simulation are available in `backend/app/scripts/`:
 
 ```bash
-# Run seat race simulation
 python backend/app/scripts/race_test.py
 ```
 
@@ -415,6 +538,7 @@ python backend/app/scripts/race_test.py
 - Docker + docker-compose setup
 - CI/CD with GitHub Actions
 - WebSocket-based real-time seat map updates (replace polling)
+- Tighten CORS origins for production
 
 ---
 
