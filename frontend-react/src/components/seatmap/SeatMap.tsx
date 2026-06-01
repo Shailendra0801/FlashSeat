@@ -13,7 +13,11 @@ export function SeatMap({ seats, onLockSeat }: SeatMapProps) {
   }
 
   return (
-    <div className="seat-grid">
+    <div
+      className="seat-grid"
+      role="grid"
+      aria-label="Venue seat map"
+    >
       {seats.map((seat) => (
         <Seat key={seat.seat_id} seat={seat} onLock={onLockSeat} />
       ))}

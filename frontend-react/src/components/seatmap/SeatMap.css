@@ -18,6 +18,42 @@
   transition: all 0.2s;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   user-select: none;
+  position: relative;
+}
+
+/* CSS Tooltip */
+.seat-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%) scale(0.9);
+  background: #1e293b;
+  color: white;
+  padding: 6px 10px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s, transform 0.15s;
+  z-index: 10;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.seat-tooltip::after {
+  content: '';
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  border: 5px solid transparent;
+  border-top-color: #1e293b;
+}
+
+.seat:hover .seat-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
 }
 
 .seat.available {
@@ -26,8 +62,9 @@
 }
 
 .seat.available:hover {
-  transform: scale(1.12);
-  box-shadow: 0 6px 15px rgba(34, 197, 94, 0.4);
+  transform: scale(1.15);
+  box-shadow: 0 6px 18px rgba(34, 197, 94, 0.45);
+  z-index: 2;
 }
 
 .seat.unavailable,
@@ -35,6 +72,13 @@
   background: #6b7280;
   color: white;
   cursor: not-allowed;
+}
+
+.seat.unavailable:hover .seat-tooltip,
+.seat.sold:hover .seat-tooltip,
+.seat.blocked:hover .seat-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
 }
 
 .seat.blocked {
@@ -52,9 +96,21 @@
   animation: seatPulse 2s ease-in-out infinite;
 }
 
+.seat.locked-by-you:hover .seat-tooltip {
+  opacity: 1;
+  transform: translateX(-50%) scale(1);
+}
+
 @keyframes seatPulse {
   0%, 100% { box-shadow: 0 0 0 2px #eab308, 0 4px 12px rgba(234, 179, 8, 0.3); }
   50% { box-shadow: 0 0 0 3px #eab308, 0 4px 20px rgba(234, 179, 8, 0.5); }
+}
+
+/* Focus styles for keyboard navigation */
+.seat:focus-visible {
+  outline: 3px solid #3b82f6;
+  outline-offset: 2px;
+  z-index: 3;
 }
 
 @media (max-width: 768px) {
@@ -70,5 +126,10 @@
 
   .seat.locked-by-you {
     font-size: 0.55rem;
+  }
+
+  .seat-tooltip {
+    font-size: 0.7rem;
+    padding: 4px 8px;
   }
 }

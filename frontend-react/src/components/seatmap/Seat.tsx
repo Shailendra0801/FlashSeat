@@ -1,6 +1,7 @@
 import type { SeatMapItem } from '../../types';
 import { useCartStore } from '../../stores/cartStore';
-import { getSeatClassName } from '../../utils/seatUtils';
+import { getSeatClassName, getSeatLabel } from '../../utils/seatUtils';
+import { SECTION_LABELS } from '../../utils/constants';
 
 interface SeatProps {
   seat: SeatMapItem;
@@ -11,17 +12,22 @@ export function Seat({ seat, onLock }: SeatProps) {
   const seatIds = useCartStore((s) => s.seatIds);
   const isLockedByMe = seatIds.has(seat.seat_id);
   const className = getSeatClassName(seat, isLockedByMe);
-  const label = `${seat.row_name}${seat.seat_number}`;
+  const label = getSeatLabel(seat);
 
   const isClickable = seat.status === 'available' && !isLockedByMe;
+
+  const statusLabel = isLockedByMe ? 'Selected' : seat.status;
+  const sectionLabel = SECTION_LABELS[seat.section] || seat.section;
+  const tooltipText = `${label} (${sectionLabel}) — ${statusLabel}`;
 
   return (
     <div
       className={className}
-      title={`${label} - ${isLockedByMe ? 'locked by you' : seat.status}`}
+      role="gridcell"
+      aria-label={tooltipText}
+      aria-disabled={!isClickable}
       onClick={isClickable ? () => onLock(seat) : undefined}
-      role={isClickable ? 'button' : undefined}
-      tabIndex={isClickable ? 0 : undefined}
+      tabIndex={isClickable ? 0 : -1}
       onKeyDown={
         isClickable
           ? (e) => {
@@ -33,6 +39,7 @@ export function Seat({ seat, onLock }: SeatProps) {
           : undefined
       }
     >
+      <span className="seat-tooltip">{tooltipText}</span>
       {isLockedByMe ? 'Locked' : label}
     </div>
   );

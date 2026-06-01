@@ -12,8 +12,11 @@ import { SessionSelector } from '../components/seatmap/SessionSelector';
 import { Cart } from '../components/cart/Cart';
 import { CheckoutSuccess } from '../components/checkout/CheckoutSuccess';
 import { WaitingRoom } from '../components/queue/WaitingRoom';
+import { API_BASE } from '../utils/constants';
 import type { EventDetail, SeatMapItem } from '../types';
 import './EventPage.css';
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function EventPage() {
   const { eventId } = useParams<{ eventId: string }>();
@@ -26,13 +29,17 @@ export function EventPage() {
   const [successOpen, setSuccessOpen] = useState(false);
 
   const { sessionId, setSession, addSeat, checkoutSuccess, clearCheckoutResult } = useCartStore();
+
+  // Validate eventId is a valid UUID
+  const isValidEventId = eventId && UUID_RE.test(eventId);
+
   const { position, estimatedWait, isInQueue, loading: queueLoading } = useQueuePolling(
-    eventId,
+    isValidEventId ? eventId : undefined,
     () => loadEvent()
   );
 
   const loadEvent = useCallback(async () => {
-    if (!eventId) return;
+    if (!isValidEventId) return;
     try {
       const data = await apiRequest<EventDetail>(`/events/${eventId}`);
       setEvent(data);
@@ -44,9 +51,13 @@ export function EventPage() {
     } finally {
       setLoading(false);
     }
-  }, [eventId, setSession, sessionId]);
+  }, [eventId, setSession, sessionId, isValidEventId]);
 
   useEffect(() => {
+    if (!isValidEventId) {
+      navigate('/dashboard');
+      return;
+    }
     loadEvent();
   }, []);
 
@@ -60,7 +71,12 @@ export function EventPage() {
     setSeats(loadedSeats);
   }, []);
 
-  const { refetch } = useSeatPolling(eventId, sessionId, user?.user_id, onSeatsLoaded);
+  const { refetch } = useSeatPolling(
+    isValidEventId ? eventId : undefined,
+    sessionId,
+    user?.user_id,
+    onSeatsLoaded
+  );
 
   const handleSessionChange = (newSessionId: string) => {
     setSession(newSessionId);
@@ -85,37 +101,39 @@ export function EventPage() {
     }
   };
 
-  const handleLeave = async () => {
-    if (eventId) {
-      try {
-        await fetch(`http://127.0.0.1:8000/events/${eventId}/leave`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('flashseat-token')}`,
-            'Content-Type': 'application/json',
-          },
-          keepalive: true,
-        });
-      } catch {}
-    }
+  const handleLeave = () => {
+    notifyLeave();
     navigate('/dashboard');
   };
 
+  const notifyLeave = useCallback(() => {
+    if (!isValidEventId) return;
+    const token = localStorage.getItem('flashseat-token');
+    if (!token) return;
+    fetch(`${API_BASE}/events/${eventId}/leave`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      keepalive: true,
+    }).catch(() => {});
+  }, [eventId, isValidEventId]);
+
   useEffect(() => {
     return () => {
-      if (eventId) {
-        navigator.sendBeacon?.('') || true;
-        fetch(`http://127.0.0.1:8000/events/${eventId}/leave`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${localStorage.getItem('flashseat-token')}`,
-            'Content-Type': 'application/json',
-          },
-          keepalive: true,
-        }).catch(() => {});
-      }
+      notifyLeave();
     };
-  }, [eventId]);
+  }, [notifyLeave]);
+
+  if (!isValidEventId) {
+    return (
+      <div className="event-page-error">
+        <p>Invalid event URL.</p>
+        <button onClick={() => navigate('/dashboard')}>Back to Dashboard</button>
+      </div>
+    );
+  }
 
   if (queueLoading || loading) {
     return (
